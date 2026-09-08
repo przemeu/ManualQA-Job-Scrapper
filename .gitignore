@@ -1,0 +1,24 @@
+﻿# Python cache
+__pycache__/
+*.py[cod]
+*.class
+*.pyo
+
+# Logs
+*.log
+scraper.log
+
+# Environment
+.venv/
+venv/
+env/
+
+# Database & Sensitive Local Data
+# WARNING: jobs.db contains your personal Telegram bot token, chat ID, and notes.
+jobs.db
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

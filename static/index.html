@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Fetcher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .tab-active { border-bottom: 2px solid #000; color: #000; font-weight: 600; }
+        .job-card-enter { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-5 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900">Job Fetcher</h1>
+            <div class="flex flex-wrap gap-2 items-center" id="actionButtons">
+                <button onclick="refreshJobs('ALL')" id="refreshBtn-ALL" class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-sync-alt"></i> Refresh ALL
+                </button>
+                <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+                <button onclick="refreshJobs('JJIT')" id="refreshBtn-JJIT" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">JJIT</button>
+                <button onclick="refreshJobs('NFJ')" id="refreshBtn-NFJ" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">NFJ</button>
+                <button onclick="refreshJobs('PRACUJ')" id="refreshBtn-PRACUJ" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Pracuj</button>
+                <button onclick="refreshJobs('PROTOCOL')" id="refreshBtn-PROTOCOL" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Protocol</button>
+                <button onclick="refreshJobs('BULLDOG')" id="refreshBtn-BULLDOG" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Bulldog</button>
+                <button onclick="refreshJobs('SOLID')" id="refreshBtn-SOLID" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Solid</button>
+                <button onclick="refreshJobs('4PROGRAMMERS')" id="refreshBtn-4PROGRAMMERS" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">4prog</button>
+                <button onclick="refreshJobs('LINKEDIN')" id="refreshBtn-LINKEDIN" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">LinkedIn</button>
+                <button onclick="refreshJobs('ROCKET')" id="refreshBtn-ROCKET" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Rocket</button>
+                <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+                <button onclick="confirmDeepSearch()" id="refreshBtn-DEEP" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-search-plus"></i> Deep Search
+                </button>
+                <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+                <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 active:scale-95" title="Instant Alerts & Automation Settings">
+                    <i class="fas fa-bell text-gray-500"></i>
+                    <span>Alerts & Auto</span>
+                    <span id="autoScanPill" class="hidden text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.2 rounded-full">ON</span>
+                </button>
+                <button onclick="openInsightsModal()" id="insightsBtn" class="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 active:scale-95" title="Market & Salary Insights Dashboard">
+                    <i class="fas fa-chart-line text-indigo-600"></i>
+                    <span>Insights</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Navigation Tabs -->
+        <div class="max-w-4xl mx-auto px-4 flex gap-8">
+            <button onclick="switchTab('ALL')" id="tab-ALL" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black font-semibold">ALL</button>
+            <button onclick="switchTab('NEW')" id="tab-NEW" class="pb-3 text-sm tab-active transition-colors hover:text-black">NEW</button>
+            <button onclick="switchTab('APPLIED')" id="tab-APPLIED" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black">APPLIED</button>
+            <button onclick="switchTab('IGNORED')" id="tab-IGNORED" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black">IGNORED</button>
+            <button onclick="switchTab('WRONG')" id="tab-WRONG" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black">WRONG OFFERS</button>
+        </div>
+        
+        <!-- Search & Filter Controls Bar -->
+        <div class="max-w-4xl mx-auto px-4 pt-3 pb-2.5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 mt-1">
+            <div class="relative flex-1 min-w-[220px] max-w-sm">
+                <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Search title, company, notes, city..." class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:bg-white transition-all" />
+                <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <!-- Filter Chips & Export -->
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <button onclick="toggleFilter('salary')" id="chip-salary" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:border-gray-300 transition-all flex items-center gap-1">
+                    <i class="fas fa-coins text-amber-500"></i> With Salary
+                </button>
+                <button onclick="toggleFilter('remote')" id="chip-remote" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:border-gray-300 transition-all flex items-center gap-1">
+                    <i class="fas fa-home text-blue-500"></i> Remote
+                </button>
+                <button onclick="toggleFilter('tricity')" id="chip-tricity" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:border-gray-300 transition-all flex items-center gap-1">
+                    <i class="fas fa-water text-cyan-500"></i> Tricity
+                </button>
+                
+                <select id="portalFilter" onchange="applyFilters()" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 focus:outline-none cursor-pointer">
+                    <option value="ALL">All Portals</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="Pracuj">Pracuj</option>
+                    <option value="NFJ">NFJ</option>
+                    <option value="JJIT">JJIT</option>
+                    <option value="Bulldog">Bulldog</option>
+                    <option value="Solid">Solid</option>
+                    <option value="Protocol">Protocol</option>
+                    <option value="4programmers">4prog</option>
+                    <option value="RocketJobs">Rocket</option>
+                </select>
+
+                <!-- Sort Dropdown -->
+                <div class="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-2.5 py-1 text-[11px] shadow-sm">
+                    <i class="fas fa-sort text-gray-400"></i>
+                    <select id="sortSelect" onchange="applySort(this.value)" class="bg-transparent font-medium text-gray-700 focus:outline-none cursor-pointer">
+                        <option value="date-desc">📅 Newest</option>
+                        <option value="company-asc">🏢 Firm (A–Z)</option>
+                        <option value="company-desc">🏢 Firm (Z–A)</option>
+                        <option value="salary-desc">💰 Highest Salary</option>
+                        <option value="title-asc">🔤 Title (A–Z)</option>
+                    </select>
+                </div>
+                
+                <button onclick="exportCSV()" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-black transition-all flex items-center gap-1 ml-1" title="Download Excel-compatible CSV of current tab">
+                    <i class="fas fa-file-excel text-emerald-600"></i> Export CSV
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            
+            <!-- Loading Progress Bar (Old Game Style + Sleek) -->
+            <div id="loadingState" class="hidden flex-col items-center justify-center mt-12 mb-12">
+                <div class="text-sm font-bold text-gray-900 mb-4 tracking-[0.2em] uppercase" id="progressTitle">Scraping Web...</div>
+                
+                <div class="w-full max-w-md bg-gray-200 h-2 mb-2 rounded-full overflow-hidden shadow-inner">
+                    <div id="progressBar" class="bg-black h-2 w-0 transition-all duration-300 ease-out"></div>
+                </div>
+                
+                <div class="flex justify-between w-full max-w-md text-xs font-medium text-gray-500 font-mono">
+                    <span id="progressPercent">0%</span>
+                    <span id="progressTime">Est. ~60s</span>
+                </div>
+            </div>
+
+            <!-- Job cards container -->
+            <div class="flex flex-col gap-4" id="jobList"></div>
+            
+            <!-- Simple spinner for local tab switching -->
+            <div id="simpleSpinner" class="hidden text-center text-gray-400 mt-10">
+                <i class="fas fa-circle-notch fa-spin text-2xl"></i>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentTab = 'NEW';
+        let progressInterval = null;
+        let allCurrentJobs = [];
+        let currentSort = 'date-desc';
+        let activeFilters = {
+            salary: false,
+            remote: false,
+            tricity: false,
+            portal: 'ALL',
+            search: ''
+        };
+
+        async function fetchJobs() {
+            const listEl = document.getElementById('jobList');
+            const spinner = document.getElementById('simpleSpinner');
+            const loadingState = document.getElementById('loadingState');
+            
+            // Only show simple spinner if we aren't currently showing the big progress bar
+            if(loadingState.classList.contains('hidden')) {
+                listEl.innerHTML = '';
+                spinner.classList.remove('hidden');
+            }
+            
+            try {
+                const response = await fetch(`/api/jobs?status=${currentTab}`);
+                const jobs = await response.json();
+                allCurrentJobs = jobs || [];
+                spinner.classList.add('hidden');
+                applyFilters();
+            } catch (e) {
+                spinner.classList.add('hidden');
+                listEl.innerHTML = '<div class="text-center text-red-500 mt-10">Error loading jobs. Is the server running?</div>';
+            }
+        }
+
+        function parseSalaryNumber(pay) {
+            if (!pay || pay === 'Not given' || pay === 'brak widełek') return -1;
+            const cleaned = pay.replace(/\xa0/g, ' ').replace(/\s+/g, '').replace(',', '.');
+            const nums = cleaned.match(/\d+(?:\.\d+)?/g);
+            if (!nums) return -1;
+            const vals = nums.map(Number).filter(n => n > 10);
+            if (!vals.length) return -1;
+            let maxV = Math.max(...vals);
+            if (pay.toLowerCase().includes('godz') || pay.toLowerCase().includes('hour')) maxV *= 168;
+            else if (pay.toLowerCase().includes('dzien') || pay.toLowerCase().includes('day')) maxV *= 21;
+            else if (pay.toLowerCase().includes('rok') || pay.toLowerCase().includes('year')) maxV /= 12;
+            if (pay.includes('EUR') || pay.includes('€')) maxV *= 4.3;
+            return maxV;
+        }
+
+        function applySort(sortVal) {
+            currentSort = sortVal;
+            applyFilters();
+        }
+
+        function filterByCompany(companyName) {
+            const input = document.getElementById('searchInput');
+            if (input) {
+                input.value = companyName;
+                applyFilters();
+            }
+        }
+
+        function applyFilters() {
+            const searchVal = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+            activeFilters.search = searchVal;
+            
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (clearBtn) {
+                if (searchVal.length > 0) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+
+            const portalVal = document.getElementById('portalFilter')?.value || 'ALL';
+            activeFilters.portal = portalVal;
+
+            let filtered = allCurrentJobs.filter(job => {
+                // Portal filter
+                if (activeFilters.portal !== 'ALL') {
+                    const src = (job.source || '').toLowerCase();
+                    if (!src.includes(activeFilters.portal.toLowerCase())) return false;
+                }
+
+                // Salary filter
+                if (activeFilters.salary) {
+                    if (!job.pay || job.pay === 'Not given') return false;
+                }
+
+                // Remote filter
+                if (activeFilters.remote) {
+                    const loc = (job.city || '') + ' ' + (job.title || '');
+                    if (!/remote|zdaln/i.test(loc)) return false;
+                }
+
+                // Tricity filter
+                if (activeFilters.tricity) {
+                    const loc = (job.city || '') + ' ' + (job.title || '');
+                    if (!/gda[nń]sk|gdynia|sopot|tr[oó]jmiasto/i.test(loc)) return false;
+                }
+
+                // Search text filter
+                if (activeFilters.search) {
+                    const haystack = [
+                        job.title || '',
+                        job.company || '',
+                        job.city || '',
+                        job.source || '',
+                        job.pay || '',
+                        job.notes || '',
+                        job.salary_asked || '',
+                        job.stage || ''
+                    ].join(' ').toLowerCase();
+
+                    const words = activeFilters.search.split(/\s+/).filter(Boolean);
+                    const matchesAll = words.every(w => haystack.includes(w));
+                    if (!matchesAll) return false;
+                }
+
+                return true;
+            });
+
+            // Sort filtered jobs
+            filtered.sort((a, b) => {
+                if (currentSort === 'company-asc') {
+                    return (a.company || '').localeCompare(b.company || '', undefined, { sensitivity: 'base' });
+                }
+                if (currentSort === 'company-desc') {
+                    return (b.company || '').localeCompare(a.company || '', undefined, { sensitivity: 'base' });
+                }
+                if (currentSort === 'title-asc') {
+                    return (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+                }
+                if (currentSort === 'salary-desc') {
+                    return parseSalaryNumber(b.pay) - parseSalaryNumber(a.pay);
+                }
+                // Default: date-desc
+                const tA = new Date((a.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
+                const tB = new Date((b.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
+                return tB - tA;
+            });
+
+            const isFiltered = activeFilters.salary || activeFilters.remote || activeFilters.tricity || (activeFilters.portal !== 'ALL') || Boolean(activeFilters.search);
+            renderJobs(filtered, isFiltered);
+        }
+
+        function toggleFilter(filterName) {
+            activeFilters[filterName] = !activeFilters[filterName];
+            const chip = document.getElementById(`chip-${filterName}`);
+            if (chip) {
+                if (activeFilters[filterName]) {
+                    chip.classList.add('bg-black', 'text-white', 'border-black');
+                    chip.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
+                } else {
+                    chip.classList.remove('bg-black', 'text-white', 'border-black');
+                    chip.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+                }
+            }
+            applyFilters();
+        }
+
+        function clearSearch() {
+            const input = document.getElementById('searchInput');
+            if (input) input.value = '';
+            applyFilters();
+        }
+
+        function clearAllFilters() {
+            ['salary', 'remote', 'tricity'].forEach(f => {
+                activeFilters[f] = false;
+                const chip = document.getElementById(`chip-${f}`);
+                if (chip) {
+                    chip.classList.remove('bg-black', 'text-white', 'border-black');
+                    chip.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+                }
+            });
+            const portalSelect = document.getElementById('portalFilter');
+            if (portalSelect) portalSelect.value = 'ALL';
+            activeFilters.portal = 'ALL';
+            clearSearch();
+        }
+
+        function exportCSV() {
+            window.location.href = `/api/export/csv?status=${encodeURIComponent(currentTab)}`;
+        }
+
+        function renderJobs(jobs, isFiltered = false) {
+            const listEl = document.getElementById('jobList');
+            listEl.innerHTML = ''; // Clear previous
+
+            if (jobs.length === 0) {
+                if (isFiltered) {
+                    listEl.innerHTML = `
+                        <div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-200">
+                            <div class="text-gray-400 text-3xl mb-2"><i class="fas fa-filter"></i></div>
+                            <div class="text-sm font-medium text-gray-700">No jobs match your search or active filters.</div>
+                            <div class="mt-2">
+                                <button onclick="clearAllFilters()" class="text-xs text-blue-600 hover:text-blue-800 font-semibold underline">Reset all filters</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    listEl.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm">No jobs found in ${currentTab}.</div>`;
+                }
+                return;
+            }
+
+            jobs.forEach((job, index) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow group job-card-enter';
+                card.style.animationDelay = `${Math.min(index * 30, 500)}ms`;
+                
+                // Status chip for ALL view
+                let statusChipHtml = '';
+                if (currentTab === 'ALL') {
+                    if (job.status === 'NEW') {
+                        statusChipHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 tracking-wider uppercase">NEW</span>`;
+                    } else if (job.status === 'APPLIED') {
+                        statusChipHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 tracking-wider uppercase">APPLIED</span>`;
+                    } else if (job.status === 'IGNORED') {
+                        statusChipHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 tracking-wider uppercase">IGNORED</span>`;
+                    }
+                }
+
+                // Actions block depends on tab
+                let actionsHtml = '';
+                if (currentTab === 'NEW' || (currentTab === 'ALL' && job.status === 'NEW')) {
+                    actionsHtml = `
+                        <button onclick="updateStatus(${job.id}, 'APPLIED')" class="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-all" title="Move to Applied">
+                            <i class="fas fa-check text-lg"></i>
+                        </button>
+                        <button onclick="updateStatus(${job.id}, 'IGNORED')" class="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all" title="Ignore / Deny">
+                            <i class="fas fa-times text-lg"></i>
+                        </button>
+                        <button onclick="updateStatus(${job.id}, 'WRONG')" class="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all" title="Wrong offer">
+                            <i class="fas fa-ban text-lg"></i>
+                        </button>
+                    `;
+                } else if (currentTab === 'APPLIED' || (currentTab === 'ALL' && job.status === 'APPLIED')) {
+                    actionsHtml = `
+                        <button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Move back to New">
+                            <i class="fas fa-undo mr-1"></i>Undo
+                        </button>
+                    `;
+                } else if (currentTab === 'IGNORED' || (currentTab === 'ALL' && job.status === 'IGNORED')) {
+                    actionsHtml = `<button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Restore to New"><i class="fas fa-undo mr-1"></i>Restore</button>`;
+                } else {
+                    actionsHtml = `<button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Restore to New"><i class="fas fa-undo mr-1"></i>Restore</button>`;
+                }
+
+                const dateObj = new Date(job.created_at + 'Z'); 
+                const dateString = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                let pipelineHtml = '';
+                if (currentTab === 'APPLIED' || (currentTab === 'ALL' && job.status === 'APPLIED')) {
+                    const stage = job.stage || 'Applied';
+                    const stageColors = {
+                        'Applied': 'bg-purple-50 text-purple-700 border-purple-200',
+                        'Recruiter Screen': 'bg-blue-50 text-blue-700 border-blue-200',
+                        'Tech Interview': 'bg-amber-50 text-amber-700 border-amber-200',
+                        'Offer': 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold',
+                        'Rejected': 'bg-rose-50 text-rose-700 border-rose-200'
+                    };
+                    const stageClass = stageColors[stage] || stageColors['Applied'];
+                    
+                    const appliedDays = Math.floor((Date.now() - new Date(job.created_at + 'Z').getTime()) / (1000 * 60 * 60 * 24));
+                    const daysLabel = appliedDays <= 0 ? 'Applied today' : `Applied ${appliedDays}d ago`;
+                    const hasExtraDetails = Boolean(job.notes || job.salary_asked || job.interview_date);
+
+                    pipelineHtml = `
+                        <div class="mt-4 pt-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-semibold text-gray-500">Pipeline:</span>
+                                <select onchange="updatePipelineStage(${job.id}, this.value)" class="text-xs font-semibold px-2.5 py-1 rounded-full border ${stageClass} cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                    <option value="Applied" ${stage === 'Applied' ? 'selected' : ''}>🟣 Applied</option>
+                                    <option value="Recruiter Screen" ${stage === 'Recruiter Screen' ? 'selected' : ''}>🔵 Recruiter Screen</option>
+                                    <option value="Tech Interview" ${stage === 'Tech Interview' ? 'selected' : ''}>🟡 Tech Interview</option>
+                                    <option value="Offer" ${stage === 'Offer' ? 'selected' : ''}>🟢 Offer</option>
+                                    <option value="Rejected" ${stage === 'Rejected' ? 'selected' : ''}>🔴 Rejected</option>
+                                </select>
+                                <span class="text-[11px] text-gray-400 ml-1"><i class="far fa-clock mr-1"></i>${daysLabel}</span>
+                                ${job.salary_asked ? `<span class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i class="fas fa-hand-holding-usd mr-1"></i>Asked: ${job.salary_asked}</span>` : ''}
+                                ${job.interview_date ? `<span class="text-[11px] font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100"><i class="far fa-calendar-check mr-1"></i>${job.interview_date.replace('T', ' ')}</span>` : ''}
+                            </div>
+                            <button onclick="togglePipelineDrawer(${job.id})" class="text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1.5 font-medium">
+                                <i class="fas fa-edit"></i>
+                                <span>${hasExtraDetails ? 'Edit Notes & Details' : '+ Add Notes & Details'}</span>
+                            </button>
+                        </div>
+                        <div id="pipeline-drawer-${job.id}" class="hidden mt-3 p-3.5 bg-gray-50 rounded-xl border border-gray-200/80 space-y-3 text-xs">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                     <label class="block font-medium text-gray-600 mb-1">Expected / Asked Salary:</label>
+                                    <input type="text" id="salary-input-${job.id}" value="${job.salary_asked || ''}" placeholder="e.g. 15 000 B2B or 12 000 UoP" class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Next Interview / Call (Date & Time):</label>
+                                    <input type="datetime-local" id="date-input-${job.id}" value="${job.interview_date || ''}" class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block font-medium text-gray-600 mb-1">Recruiter Notes / Technical Tasks:</label>
+                                <textarea id="notes-input-${job.id}" rows="2" placeholder="e.g. Spoke with Kasia on LinkedIn. Technical test task due Friday. Mentioned API testing..." class="w-full bg-white border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-blue-500 focus:outline-none">${job.notes || ''}</textarea>
+                            </div>
+                            <div class="flex justify-between items-center pt-1">
+                                <span id="save-status-${job.id}" class="text-[11px] text-green-600 font-medium hidden"><i class="fas fa-check mr-1"></i>Saved!</span>
+                                <div class="flex gap-2 ml-auto">
+                                    <button onclick="savePipelineDetails(${job.id})" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95">Save Details</button>
+                                    <button onclick="togglePipelineDrawer(${job.id})" class="text-gray-500 hover:text-gray-700 px-2.5 py-1.5 text-xs">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start w-full">
+                        <div class="flex-1 min-w-0 pr-6">
+                            <div class="flex items-center gap-2.5 flex-wrap mb-1.5">
+                                ${statusChipHtml}
+                                <a href="${job.url}" target="_blank" class="text-lg font-semibold text-gray-900 hover:text-blue-600 truncate transition-colors">
+                                    ${job.title}
+                                </a>
+                                ${job.company ? `
+                                    <button onclick="filterByCompany('${job.company.replace(/'/g, "\\'")}')" class="text-xs font-semibold text-gray-800 bg-gray-100 hover:bg-gray-200 hover:text-blue-600 px-2.5 py-0.5 rounded-md border border-gray-200/80 flex items-center gap-1.5 transition-colors cursor-pointer" title="Click to filter by ${job.company}">
+                                        <i class="fas fa-building text-gray-400 text-[10px]"></i>
+                                        <span>${job.company}</span>
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">${job.source}</span>
+                                ${job.city ? `<span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100"><i class="fas fa-map-marker-alt mr-1"></i>${job.city}</span>` : ''}
+                                ${job.pay && job.pay !== 'Not given' ? `<span class="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-100"><i class="fas fa-coins mr-1"></i>${job.pay}</span>` : `<span class="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200"><i class="fas fa-coins mr-1"></i>Not given</span>`}
+                                ${job.published_at ? `<span class="text-xs font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100"><i class="far fa-calendar-alt mr-1"></i>${job.published_at}</span>` : `<span class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i>${dateString}</span>`}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            ${actionsHtml}
+                        </div>
+                    </div>
+                    ${pipelineHtml}
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        async function updateStatus(jobId, newStatus) {
+            try {
+                await fetch(`/api/jobs/${jobId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                fetchJobs(); 
+            } catch (e) {
+                alert("Failed to update status.");
+            }
+        }
+
+        function togglePipelineDrawer(jobId) {
+            const drawer = document.getElementById(`pipeline-drawer-${jobId}`);
+            if (drawer) {
+                drawer.classList.toggle('hidden');
+            }
+        }
+
+        async function updatePipelineStage(jobId, newStage) {
+            try {
+                await fetch(`/api/jobs/${jobId}/pipeline`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stage: newStage })
+                });
+                fetchJobs();
+            } catch (e) {
+                alert("Failed to update pipeline stage: " + e.message);
+            }
+        }
+
+        async function savePipelineDetails(jobId) {
+            const salary = document.getElementById(`salary-input-${jobId}`).value.trim();
+            const date = document.getElementById(`date-input-${jobId}`).value;
+            const notes = document.getElementById(`notes-input-${jobId}`).value.trim();
+            const statusEl = document.getElementById(`save-status-${jobId}`);
+
+            try {
+                await fetch(`/api/jobs/${jobId}/pipeline`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        salary_asked: salary,
+                        interview_date: date,
+                        notes: notes
+                    })
+                });
+                if (statusEl) {
+                    statusEl.classList.remove('hidden');
+                    setTimeout(() => {
+                        if (statusEl) statusEl.classList.add('hidden');
+                    }, 2000);
+                }
+                fetchJobs();
+            } catch (e) {
+                alert("Failed to save pipeline details: " + e.message);
+            }
+        }
+
+        function disableButtons(disable) {
+            const btns = document.getElementById('actionButtons').querySelectorAll('button');
+            btns.forEach(b => {
+                b.disabled = disable;
+                if(disable) b.classList.add('opacity-50', 'cursor-not-allowed');
+                else b.classList.remove('opacity-50', 'cursor-not-allowed');
+            });
+        }
+
+        function confirmDeepSearch() {
+            const confirmed = confirm(
+                "⚠️ DEEP SEARCH\n\n" +
+                "This will perform an exhaustive search across all job boards,\n" +
+                "scrolling deeper to find older listings.\n\n" +
+                "Estimated time: ~10-15 minutes\n\n" +
+                "Continue?"
+            );
+            if (confirmed) {
+                refreshJobs('ALL', true);
+            }
+        }
+
+        async function refreshJobs(portal, deep = false) {
+            disableButtons(true);
+            
+            const listEl = document.getElementById('jobList');
+            listEl.innerHTML = ''; // Hide list while scraping
+            
+            // Setup Progress Bar UI
+            const loadingState = document.getElementById('loadingState');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressTitle = document.getElementById('progressTitle');
+            const progressTime = document.getElementById('progressTime');
+            
+            loadingState.classList.remove('hidden');
+            loadingState.classList.add('flex');
+            
+            // Estimates (Playwright takes time to boot and navigate)
+            let estimatedSeconds;
+            if (deep) {
+                estimatedSeconds = (portal === 'ALL') ? 600 : 180;
+            } else {
+                estimatedSeconds = (portal === 'ALL') ? 80 : 20;
+            }
+            const estMinutes = Math.ceil(estimatedSeconds / 60);
+            progressTime.innerText = deep ? `Est. ~${estMinutes} min (Deep)` : `Est. ~${estimatedSeconds}s`;
+            progressTitle.innerText = deep 
+                ? `🔍 DEEP SEARCH — ${portal}` 
+                : `LAUNCHING BROWSER FOR ${portal}`;
+            
+            let progress = 0;
+            const tickRate = 500; // ms
+            const increment = 100 / ((estimatedSeconds * 1000) / tickRate);
+            
+            // Fake progression
+            progressInterval = setInterval(() => {
+                if (progress < 98) { // Stop at 98% until actually done
+                    progress += (increment * (1 - (progress/100))); // Slows down as it gets closer to 100
+                    progressBar.style.width = `${progress}%`;
+                    progressPercent.innerText = `${Math.floor(progress)}%`;
+                    
+                    if (deep) {
+                        if(progress > 5 && progress < 20) progressTitle.innerText = `🔍 SCROLLING DEEP ON JOB BOARDS...`;
+                        if(progress > 20 && progress < 40) progressTitle.innerText = `🔍 COLLECTING ALL JOB URLs...`;
+                        if(progress > 40 && progress < 70) progressTitle.innerText = `🔍 VISITING INDIVIDUAL JOB PAGES...`;
+                        if(progress > 70 && progress < 90) progressTitle.innerText = `🔍 ANALYZING REQUIREMENTS...`;
+                        if(progress > 90) progressTitle.innerText = `🔍 DEDUPLICATING ENTRIES...`;
+                    } else {
+                        if(progress > 20 && progress < 50) progressTitle.innerText = `EXTRACTING JOB LINKS...`;
+                        if(progress > 50 && progress < 80) progressTitle.innerText = `ANALYZING REQUIREMENTS...`;
+                        if(progress > 80) progressTitle.innerText = `DEDUPLICATING ENTRIES...`;
+                    }
+                }
+            }, tickRate);
+
+            let completionMsg = "";
+            try {
+                const deepParam = deep ? '&deep=true' : '';
+                const resp = await fetch(`/api/refresh?portal=${portal}${deepParam}`, { method: 'POST' });
+                const result = await resp.json();
+                completionMsg = result.message || "";
+            } catch(e) {
+                completionMsg = "Scraper error: " + e.message;
+            }
+            
+            // Finish Progress Bar
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressPercent.innerText = `100%`;
+            progressTitle.innerText = `COMPLETE!`;
+            
+            setTimeout(() => {
+                loadingState.classList.add('hidden');
+                loadingState.classList.remove('flex');
+                progressBar.style.width = '0%';
+                
+                disableButtons(false);
+                fetchJobs();
+
+                if (completionMsg) {
+                    showRefreshToast(completionMsg);
+                }
+            }, 800);
+        }
+
+        function showRefreshToast(msg) {
+            const toast = document.getElementById('refreshToast');
+            const toastMsg = document.getElementById('refreshToastMsg');
+            if (!toast || !toastMsg) return;
+            toastMsg.innerText = msg;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+            
+            if (window._toastTimeout) clearTimeout(window._toastTimeout);
+            window._toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('flex');
+            }, 9000);
+        }
+
+        function closeRefreshToast() {
+            const toast = document.getElementById('refreshToast');
+            if (toast) {
+                toast.classList.add('hidden');
+                toast.classList.remove('flex');
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            ['ALL', 'NEW', 'APPLIED', 'IGNORED', 'WRONG'].forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if (el) {
+                    if (t === tab) {
+                        el.classList.add('tab-active');
+                        el.classList.remove('text-gray-400', 'font-normal');
+                    } else {
+                        el.classList.remove('tab-active');
+                        el.classList.add('text-gray-400', 'font-normal');
+                    }
+                }
+            });
+
+            fetchJobs();
+        }
+
+        // ==========================================
+        // Settings & Alerts Automation Logic
+        // ==========================================
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const s = await res.json();
+                
+                document.getElementById('setting-auto-scan').checked = (s.auto_scan_enabled === 'true');
+                document.getElementById('setting-interval').value = s.scan_interval_minutes || '60';
+                document.getElementById('setting-desktop-notif').checked = (s.desktop_notifications !== 'false');
+                document.getElementById('setting-tg-notif').checked = (s.telegram_notifications === 'true');
+                document.getElementById('setting-tg-token').value = s.telegram_token || '';
+                document.getElementById('setting-tg-chat-id').value = s.telegram_chat_id || '';
+
+                const pill = document.getElementById('autoScanPill');
+                if (s.auto_scan_enabled === 'true') {
+                    pill.innerText = `${s.scan_interval_minutes || 60}m ON`;
+                    pill.classList.remove('hidden');
+                } else {
+                    pill.classList.add('hidden');
+                }
+            } catch (e) {
+                console.error("Failed to load settings", e);
+            }
+        }
+
+        function openSettingsModal() {
+            loadSettings();
+            document.getElementById('settingsFeedback').classList.add('hidden');
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        async function saveSettings() {
+            const btn = document.getElementById('saveSettingsBtn');
+            const feedback = document.getElementById('settingsFeedback');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Saving...`;
+
+            const payload = {
+                auto_scan_enabled: document.getElementById('setting-auto-scan').checked ? 'true' : 'false',
+                scan_interval_minutes: document.getElementById('setting-interval').value,
+                desktop_notifications: document.getElementById('setting-desktop-notif').checked ? 'true' : 'false',
+                telegram_notifications: document.getElementById('setting-tg-notif').checked ? 'true' : 'false',
+                telegram_token: document.getElementById('setting-tg-token').value.trim(),
+                telegram_chat_id: document.getElementById('setting-tg-chat-id').value.trim()
+            };
+
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                feedback.className = "text-xs text-center py-2 rounded-lg font-medium bg-green-50 text-green-700 border border-green-200 block";
+                feedback.innerText = "Settings saved successfully!";
+                
+                loadSettings();
+                setTimeout(() => { closeSettingsModal(); }, 900);
+            } catch (e) {
+                feedback.className = "text-xs text-center py-2 rounded-lg font-medium bg-red-50 text-red-700 border border-red-200 block";
+                feedback.innerText = "Failed to save settings.";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-check"></i> Save Settings`;
+            }
+        }
+
+        async function testDesktopNotification() {
+            try {
+                const res = await fetch('/api/test-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channel: 'desktop' })
+                });
+                const data = await res.json();
+                alert(data.message || "Desktop notification triggered! Check bottom-right screen corner.");
+            } catch (e) {
+                alert("Error triggering desktop notification: " + e.message);
+            }
+        }
+
+        async function testTelegramNotification() {
+            const token = document.getElementById('setting-tg-token').value.trim();
+            const chatId = document.getElementById('setting-tg-chat-id').value.trim();
+            const btn = document.getElementById('testTgBtn');
+
+            if (!token || !chatId) {
+                alert("Please fill in both Telegram Bot Token and Chat ID before testing.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Sending...`;
+
+            try {
+                const res = await fetch('/api/test-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channel: 'telegram', token: token, chat_id: chatId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ Success! " + data.message);
+                } else {
+                    alert("❌ Telegram Error: " + data.message);
+                }
+            } catch (e) {
+                alert("Error testing Telegram: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fab fa-telegram text-sky-500"></i> Send Test Telegram Alert`;
+            }
+        }
+
+        // ==========================================
+        // Market & Salary Insights Logic
+        // ==========================================
+        async function openInsightsModal() {
+            document.getElementById('insightsModal').classList.remove('hidden');
+            document.getElementById('insightsLoading').classList.remove('hidden');
+            document.getElementById('insightsContent').classList.add('hidden');
+            await loadInsights();
+        }
+
+        function closeInsightsModal() {
+            document.getElementById('insightsModal').classList.add('hidden');
+        }
+
+        async function loadInsights() {
+            try {
+                const res = await fetch('/api/insights');
+                const data = await res.json();
+                
+                // Salary
+                const s = data.salary;
+                document.getElementById('stat-avg-salary').innerText = s.avg_overall ? `~${Math.round(s.avg_overall / 1000)}k PLN` : 'N/A';
+                document.getElementById('stat-salary-range').innerText = (s.avg_min && s.avg_max) ? `${s.avg_min.toLocaleString()} - ${s.avg_max.toLocaleString()} PLN / mo` : 'Insufficient data';
+                document.getElementById('stat-salary-transparency').innerText = `${s.disclosed_pct || 0}%`;
+                document.getElementById('stat-salary-count').innerText = `${s.disclosed_count || 0} of ${data.total_jobs || 0} offers disclosed`;
+                
+                // Locations
+                const loc = data.locations;
+                document.getElementById('stat-remote-pct').innerText = `${loc.remote_pct || 0}%`;
+                document.getElementById('stat-tricity-pct').innerText = `${loc.tricity_pct || 0}%`;
+                const topCitiesHtml = (loc.top_cities || []).map(c => `<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-medium">${c[0]}: ${c[1]}</span>`).join(' ');
+                document.getElementById('stat-top-cities').innerHTML = topCitiesHtml || '<span class="text-gray-400 text-xs">None</span>';
+                
+                // Salary brackets
+                const b = s.brackets || {};
+                const bMax = Math.max(...Object.values(b), 1);
+                const bracketsHtml = Object.entries(b).map(([range, cnt]) => {
+                    const pct = Math.round((cnt / (s.disclosed_count || 1)) * 100);
+                    return `
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs">
+                                <span class="font-medium text-gray-700">${range}</span>
+                                <span class="text-gray-500">${cnt} (${pct}%)</span>
+                            </div>
+                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: ${(cnt / bMax) * 100}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('stat-salary-brackets').innerHTML = bracketsHtml;
+
+                // Pipeline Funnel
+                const p = data.pipeline;
+                const f = p.funnel || {};
+                const st = p.status_breakdown || {};
+                document.getElementById('funnel-total').innerText = data.total_jobs || 0;
+                document.getElementById('funnel-new').innerText = st.NEW || 0;
+                document.getElementById('funnel-applied').innerText = st.APPLIED || 0;
+                document.getElementById('funnel-screen').innerText = f['Recruiter Screen'] || 0;
+                document.getElementById('funnel-tech').innerText = f['Tech Interview'] || 0;
+                document.getElementById('funnel-offer').innerText = f['Offer'] || 0;
+                document.getElementById('funnel-rejected').innerText = f['Rejected'] || 0;
+
+                // Portals breakdown
+                const portalsHtml = Object.entries(data.portals || {})
+                    .sort((a,b) => b[1] - a[1])
+                    .map(([portal, count]) => {
+                        const pct = Math.round((count / (data.total_jobs || 1)) * 100);
+                        return `
+                            <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100 text-xs">
+                                <span class="font-semibold text-gray-800">${portal}</span>
+                                <span class="text-gray-500 font-medium">${count} <span class="text-gray-400 text-[10px]">(${pct}%)</span></span>
+                            </div>
+                        `;
+                    }).join('');
+                document.getElementById('stat-portals-list').innerHTML = portalsHtml;
+
+                // In-Demand Skills
+                const skillsHtml = (data.skills || []).map(([skill, count]) => {
+                    return `
+                        <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100 text-xs">
+                            <span class="font-medium text-gray-700">${skill}</span>
+                            <span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px]">${count} offers</span>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('stat-skills-list').innerHTML = skillsHtml;
+
+                document.getElementById('insightsLoading').classList.add('hidden');
+                document.getElementById('insightsContent').classList.remove('hidden');
+            } catch (e) {
+                document.getElementById('insightsLoading').innerHTML = '<div class="text-red-500 text-center py-6">Failed to load market insights.</div>';
+            }
+        }
+
+        // Initial load
+        fetchJobs();
+        loadSettings();
+    </script>
+
+    <!-- Settings & Alerts Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center text-sm shadow-sm">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-base">Alerts & Auto-Scan</h3>
+                        <p class="text-xs text-gray-500">100% Free Instant Notifications & Background Scraping</p>
+                    </div>
+                </div>
+                <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+                <!-- Section 1: Background Automation -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200/70 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-gray-900 text-sm block">Automatic Background Scan</span>
+                            <span class="text-xs text-gray-500">Scrapes portals quietly in the background</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="setting-auto-scan" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                        </label>
+                    </div>
+                    <div class="pt-2 border-t border-gray-200 flex items-center justify-between text-xs">
+                        <span class="text-gray-600 font-medium">Scan Frequency:</span>
+                        <select id="setting-interval" class="bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none focus:ring-1 focus:ring-black">
+                            <option value="30">Every 30 Minutes</option>
+                            <option value="60">Every 1 Hour (Recommended)</option>
+                            <option value="120">Every 2 Hours</option>
+                            <option value="240">Every 4 Hours</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Section 2: Windows Desktop Notification -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200/70 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-gray-900 text-sm block">Windows Desktop Toast</span>
+                            <span class="text-xs text-gray-500">Pops up native Windows 10/11 banner alert</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="setting-desktop-notif" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                    <div class="pt-2 border-t border-gray-200 flex justify-end">
+                        <button onclick="testDesktopNotification()" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                            <i class="fas fa-desktop text-blue-500"></i> Test Desktop Alert
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Section 3: Telegram Mobile Notifications -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200/70 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-gray-900 text-sm block">Telegram Push Notifications</span>
+                            <span class="text-xs text-gray-500">Get alerts straight to your phone (100% Free)</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="setting-tg-notif" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+                        </label>
+                    </div>
+
+                    <!-- Setup hint -->
+                    <div class="bg-white p-3 rounded-lg border border-gray-200 text-[11px] text-gray-600 space-y-1">
+                        <div class="font-semibold text-gray-800 flex items-center gap-1">
+                            <i class="fab fa-telegram text-sky-500 text-sm"></i> 30-Second Setup Guide:
+                        </div>
+                        <div>1. In Telegram, message <a href="https://t.me/BotFather" target="_blank" class="text-blue-600 underline font-mono">@BotFather</a> ➔ type <b>/newbot</b> to get your <b>Bot Token</b>.</div>
+                        <div>2. Message <a href="https://t.me/userinfobot" target="_blank" class="text-blue-600 underline font-mono">@userinfobot</a> to get your numeric <b>Chat ID</b>.</div>
+                    </div>
+
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <label class="font-medium text-gray-700 block mb-1">Bot Token:</label>
+                            <input type="password" id="setting-tg-token" placeholder="123456789:ABCdefGhIjkLmNoPq..." class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-black">
+                        </div>
+                        <div>
+                            <label class="font-medium text-gray-700 block mb-1">Your Chat ID:</label>
+                            <input type="text" id="setting-tg-chat-id" placeholder="987654321" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-black">
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-gray-200 flex justify-end">
+                        <button onclick="testTelegramNotification()" id="testTgBtn" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                            <i class="fab fa-telegram text-sky-500"></i> Send Test Telegram Alert
+                        </button>
+                    </div>
+                </div>
+
+                <div id="settingsFeedback" class="hidden text-xs text-center py-1.5 rounded-lg font-medium"></div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                <button onclick="closeSettingsModal()" class="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors">Cancel</button>
+                <button onclick="saveSettings()" id="saveSettingsBtn" class="bg-black hover:bg-gray-800 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-2">
+                    <i class="fas fa-check"></i> Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market & Salary Insights Modal -->
+    <div id="insightsModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50/40">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-base">Market & Salary Insights</h3>
+                        <p class="text-xs text-gray-500">Live intelligence computed from your tracked QA jobs</p>
+                    </div>
+                </div>
+                <button onclick="closeInsightsModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Loading indicator -->
+            <div id="insightsLoading" class="py-16 text-center text-gray-400">
+                <i class="fas fa-circle-notch fa-spin text-3xl text-indigo-500 mb-3"></i>
+                <div class="text-xs font-medium text-gray-500">Calculating QA market benchmarks...</div>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="insightsContent" class="hidden p-6 space-y-6 max-h-[82vh] overflow-y-auto">
+                <!-- Row 1: KPI Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-gradient-to-br from-emerald-50 to-white p-4 rounded-xl border border-emerald-100/80">
+                        <div class="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider mb-1">Average Salary</div>
+                        <div class="text-2xl font-black text-emerald-600 tracking-tight" id="stat-avg-salary">--</div>
+                        <div class="text-[11px] text-gray-500 font-medium mt-1" id="stat-salary-range">--</div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-indigo-50 to-white p-4 rounded-xl border border-indigo-100/80">
+                        <div class="text-[11px] font-semibold text-indigo-800 uppercase tracking-wider mb-1">Pay Transparency</div>
+                        <div class="text-2xl font-black text-indigo-600 tracking-tight" id="stat-salary-transparency">--</div>
+                        <div class="text-[11px] text-gray-500 font-medium mt-1" id="stat-salary-count">--</div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-100/80">
+                        <div class="text-[11px] font-semibold text-blue-800 uppercase tracking-wider mb-1">Work Location</div>
+                        <div class="text-2xl font-black text-blue-600 tracking-tight flex items-center gap-1.5">
+                            <span id="stat-remote-pct">--</span>
+                            <span class="text-xs font-medium text-gray-400">Remote</span>
+                        </div>
+                        <div class="text-[11px] text-gray-500 font-medium mt-1">
+                            Tricity: <span id="stat-tricity-pct" class="font-bold text-gray-700">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Salary Brackets & Distribution -->
+                <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-layer-group text-emerald-600"></i> Monthly Salary Distribution (PLN)
+                        </span>
+                        <span class="text-[11px] text-gray-400">Standardized to B2B/UoP monthly</span>
+                    </div>
+                    <div class="space-y-2.5" id="stat-salary-brackets"></div>
+                </div>
+
+                <!-- Row 3: Funnel & Pipeline -->
+                <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
+                    <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                        <i class="fas fa-filter text-purple-600"></i> Pipeline Funnel
+                    </span>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                        <div class="bg-white p-2.5 rounded-lg border border-gray-200/80">
+                            <div class="text-[10px] uppercase font-bold text-gray-400">All Tracked</div>
+                            <div class="text-base font-black text-gray-900 mt-0.5" id="funnel-total">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-purple-100 bg-purple-50/30">
+                            <div class="text-[10px] uppercase font-bold text-purple-600">Applied</div>
+                            <div class="text-base font-black text-purple-700 mt-0.5" id="funnel-applied">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-blue-100 bg-blue-50/30">
+                            <div class="text-[10px] uppercase font-bold text-blue-600">Screening</div>
+                            <div class="text-base font-black text-blue-700 mt-0.5" id="funnel-screen">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-amber-100 bg-amber-50/30">
+                            <div class="text-[10px] uppercase font-bold text-amber-600">Tech Interview</div>
+                            <div class="text-base font-black text-amber-700 mt-0.5" id="funnel-tech">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-emerald-100 bg-emerald-50/30">
+                            <div class="text-[10px] uppercase font-bold text-emerald-600">Offers</div>
+                            <div class="text-base font-black text-emerald-700 mt-0.5" id="funnel-offer">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-rose-100 bg-rose-50/30">
+                            <div class="text-[10px] uppercase font-bold text-rose-600">Rejected</div>
+                            <div class="text-base font-black text-rose-700 mt-0.5" id="funnel-rejected">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-gray-200/80">
+                            <div class="text-[10px] uppercase font-bold text-gray-400">New (Queue)</div>
+                            <div class="text-base font-black text-gray-700 mt-0.5" id="funnel-new">--</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border border-gray-200/80">
+                            <div class="text-[10px] uppercase font-bold text-gray-400">Top Locations</div>
+                            <div class="mt-1 flex flex-wrap gap-1 justify-center" id="stat-top-cities"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 4: Portals & In-Demand Skills -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
+                        <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                            <i class="fas fa-globe text-blue-500"></i> Portal Sources
+                        </span>
+                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1" id="stat-portals-list"></div>
+                    </div>
+
+                    <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
+                        <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                            <i class="fas fa-tags text-indigo-500"></i> Mentioned Skills & Keywords
+                        </span>
+                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1" id="stat-skills-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                <span>Updated in real-time as jobs are discovered</span>
+                <button onclick="closeInsightsModal()" class="px-4 py-1.5 bg-black hover:bg-gray-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-all">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Refresh Completion Breakdown Toast -->
+    <div id="refreshToast" class="hidden fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-750 flex items-center gap-3 text-xs max-w-md animate-in slide-in-from-bottom-5 duration-300">
+        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-check-circle text-sm"></i>
+        </div>
+        <div class="flex-1 font-medium leading-relaxed" id="refreshToastMsg"></div>
+        <button onclick="closeRefreshToast()" class="text-gray-400 hover:text-white p-1 transition-colors">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</body>
+</html>

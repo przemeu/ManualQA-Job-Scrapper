@@ -1330,9 +1330,25 @@ def scrape_linkedin(browser, deep=False):
             continue
             
         loc = item['location']
-        is_remote = item['is_remote']
-        is_tricity = bool(parsers.POMERANIA_REGEX.search(loc))
-        if not is_remote and not is_tricity:
+        is_pomerania = bool(parsers.POMERANIA_REGEX.search(loc + ' ' + title))
+        is_hybrid = bool(re.search(r'(?i)\b(hybrid|hybryd\w*)\b', loc + ' ' + title))
+        is_onsite = bool(re.search(r'(?i)\b(on-site|na miejscu|stacjonarn\w*)\b', loc + ' ' + title))
+        has_other_city = bool(parsers.NON_POMERANIA_CITIES_REGEX.search(loc + ' ' + title))
+        is_explicit_remote = bool(re.search(r'(?i)\b(remote|zdaln\w*)\b', loc + ' ' + title))
+        
+        # 1. Reject if hybrid or on-site in non-Pomerania city
+        if is_hybrid and not is_pomerania:
+            logger.info(f"  REJECTED (LinkedIn) non-Pomerania hybrid card: {title} @ {loc}")
+            record_rejected_other("LinkedIn", title, "Location")
+            continue
+            
+        if is_onsite and not is_pomerania:
+            logger.info(f"  REJECTED (LinkedIn) non-Pomerania on-site card: {title} @ {loc}")
+            record_rejected_other("LinkedIn", title, "Location")
+            continue
+            
+        if has_other_city and not is_pomerania and not is_explicit_remote:
+            logger.info(f"  REJECTED (LinkedIn) non-Pomerania city without remote card: {title} @ {loc}")
             record_rejected_other("LinkedIn", title, "Location")
             continue
             
@@ -1364,6 +1380,51 @@ def scrape_linkedin(browser, deep=False):
                     
             desc = str(ld_data.get('description') or soup.get_text(separator=' ', strip=True))
             
+            # --- Location & Hybrid Verification ---
+            ld_locality = ""
+            jl = ld_data.get('jobLocation') or {}
+            if isinstance(jl, dict):
+                addr = jl.get('address') or {}
+                if isinstance(addr, dict):
+                    ld_locality = addr.get('addressLocality') or ''
+            ld_loc_type = ld_data.get('jobLocationType') or ''
+            
+            topcard_loc = ""
+            for tag in soup.find_all(['span', 'div'], class_=lambda cl: cl and any(x in str(cl) for x in ['topcard__flavor', 'location', 'workplace'])):
+                topcard_loc += " " + tag.get_text(strip=True)
+                
+            combined_loc_text = f"{item['location']} {ld_locality} {topcard_loc} {item['title']}"
+            is_pomerania = bool(parsers.POMERANIA_REGEX.search(combined_loc_text))
+            
+            is_hybrid_desc = bool(re.search(
+                r'(?i)\b(hybryd\w*|hybrid|model hybrydowy|praca hybrydowa|system hybrydowy|dni z biura|z biura w\b|z biura we\b)\b',
+                desc[:2500] + ' ' + combined_loc_text
+            ))
+            is_onsite_desc = bool(re.search(
+                r'(?i)\b(stacjonarn\w*|on-site|100%\s*stacjonarnie|praca z biura)\b',
+                desc[:2500] + ' ' + combined_loc_text
+            ))
+            has_other_city = bool(parsers.NON_POMERANIA_CITIES_REGEX.search(combined_loc_text))
+            
+            # REJECT if hybrid outside Pomerania
+            if is_hybrid_desc and not is_pomerania:
+                logger.info(f"  REJECTED (LinkedIn) non-Pomerania hybrid: {item['title']} @ {combined_loc_text[:60]}")
+                record_rejected_other("LinkedIn", item['title'], "Location")
+                continue
+                
+            # REJECT if on-site outside Pomerania
+            if is_onsite_desc and not is_pomerania:
+                logger.info(f"  REJECTED (LinkedIn) non-Pomerania on-site: {item['title']} @ {combined_loc_text[:60]}")
+                record_rejected_other("LinkedIn", item['title'], "Location")
+                continue
+                
+            # REJECT if located in another city and not TELECOMMUTE and not explicitly 100% remote
+            is_100_remote = (ld_loc_type == 'TELECOMMUTE') or bool(re.search(r'(?i)\b(100%\s*remote|fully\s*remote|ca[łl]kowicie\s*zdalnie|remote|zdalnie)\b', topcard_loc))
+            if has_other_city and not is_pomerania and not is_100_remote:
+                logger.info(f"  REJECTED (LinkedIn) other city not 100% remote: {item['title']} @ {combined_loc_text[:60]}")
+                record_rejected_other("LinkedIn", item['title'], "Location")
+                continue
+
             # Check automation tools in requirements
             has_auto = False
             for req_word in ['wymagania', 'oczekujemy', 'requirements', 'must have', 'required', 'qualifications']:
@@ -1404,10 +1465,19 @@ def scrape_linkedin(browser, deep=False):
                     
             pub_date = parsers.format_date_str(item['pub_date'] or str(ld_data.get('datePosted') or ''))
             
-            is_remote = item['is_remote']
-            loc = item['location']
-            is_tricity = bool(parsers.POMERANIA_REGEX.search(loc))
-            city_display = "Remote" if is_remote and not is_tricity else (f"{loc} / Remote" if is_remote and is_tricity else loc)
+            if is_pomerania and is_hybrid_desc:
+                m_pom = parsers.POMERANIA_REGEX.search(combined_loc_text)
+                p_city = m_pom.group(0).title() if m_pom else "Gdańsk"
+                city_display = f"{p_city} (Hybrid)"
+            elif is_pomerania and is_100_remote:
+                m_pom = parsers.POMERANIA_REGEX.search(combined_loc_text)
+                p_city = m_pom.group(0).title() if m_pom else "Gdańsk"
+                city_display = f"{p_city} / Remote"
+            elif is_pomerania:
+                m_pom = parsers.POMERANIA_REGEX.search(combined_loc_text)
+                city_display = m_pom.group(0).title() if m_pom else "Gdańsk"
+            else:
+                city_display = "Remote"
             
             jobs.append({
                 'title': item['title'],

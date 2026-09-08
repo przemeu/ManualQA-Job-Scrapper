@@ -34,14 +34,29 @@ def is_title_valid(title: str) -> bool:
         return False
     return True
 
+NON_POMERANIA_CITIES_REGEX = re.compile(
+    r'(?i)\b(warszaw\w*|warsaw|krak[óo]w|krakow|wroc[łl]aw|wroclaw|pozna[ńn]|poznan|'
+    r'katowic\w*|silesia|[śs]l[ąa]sk\w*|[łl][óo]d[źz]|lodz|szczecin|lublin|bia[łl]ystok|'
+    r'rzesz[óo]w|bydgoszcz|toru[ńn]|kielce|radom|gliwice|zabrze|bielsko|opole|cz[eę]stochow\w*|olsztyn)\b'
+)
+
 def is_location_valid(is_remote: bool, is_hybrid: bool, location_strings: List[str]) -> bool:
-    if is_remote:
-        return True
+    combined = ' '.join(location_strings)
+    is_pomerania = bool(POMERANIA_REGEX.search(combined))
+    has_other_city = bool(NON_POMERANIA_CITIES_REGEX.search(combined))
+    
+    # If hybrid: only acceptable if located in Pomerania
     if is_hybrid:
-        for loc in location_strings:
-            if POMERANIA_REGEX.search(loc):
-                return True
-    return False
+        return is_pomerania
+        
+    # If remote: make sure it is not secretly an on-site or hybrid in another city
+    if is_remote:
+        if (has_other_city or re.search(r'(?i)\b(hybrid|hybryd\w*|on-site|stacjonarn\w*)\b', combined)) and not is_pomerania:
+            if not re.search(r'(?i)\b(100%\s*remote|fully\s*remote|ca[łl]kowicie\s*zdalnie)\b', combined):
+                return False
+        return True
+        
+    return is_pomerania
 
 # City names we care about, in priority order
 CITY_NAMES = ['Gdańsk', 'Gdynia', 'Sopot', 'Rumia', 'Reda', 'Wejherowo', 'Tczew', 'Słupsk', 'Malbork', 'Starogard Gdański', 'Kwidzyn', 'Lębork', 'Pruszcz Gdański']

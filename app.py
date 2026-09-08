@@ -245,8 +245,8 @@ def scrape_metadata_from_url(url: str) -> dict:
 def auto_scrape_and_notify():
     try:
         import scraper
-        logger.info("Auto-scan started...")
-        new_jobs = scraper.run_scraper(portal='ALL', deep=False)
+        scrape_res = scraper.run_scraper(portal='ALL', deep=False)
+        new_jobs = scrape_res.get('jobs', []) if isinstance(scrape_res, dict) else (scrape_res or [])
         conn = database.get_db()
         cursor = conn.cursor()
         added_jobs = []

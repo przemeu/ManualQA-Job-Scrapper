@@ -5,6 +5,7 @@ import logging
 import time
 import json
 import re
+import requests
 
 METRICS = {
     "scanned": 0,
@@ -1665,26 +1666,248 @@ def scrape_qaboard(browser, deep=False):
     logger.info("Scraping QA Board (https://qaboard.pl/jobs)...")
     update_progress("QABoard", "", "Scanning QA Board listings...")
     jobs = []
-    page = browser.new_page()
     seen_urls = set()
     
-    max_pages = 5 if deep else 2
-    for page_num in range(1, max_pages + 1):
-        list_url = f"https://qaboard.pl/jobs?page={page_num}" if page_num > 1 else "https://qaboard.pl/jobs"
+    # 1. Try direct Supabase REST API (instantaneous, complete dataset including all 50+ Manual QA partner offers)
+    apikey = "sb_publishable_OY9Co6kT10HZ2Y2NhyQCjQ_e128WSDE"
+    headers = {
+        'apikey': apikey,
+        'authorization': f'Bearer {apikey}'
+    }
+    use_api = True
+    aggregated_jobs = []
+    direct_jobs = []
+    
+    try:
+        r_agg = requests.get(
+            'https://mwcgwvlychlilimzawya.supabase.co/rest/v1/aggregated_job_offer?select=*&country=eq.PL&limit=1000',
+            headers=headers,
+            timeout=12
+        )
+        if r_agg.status_code == 200:
+            aggregated_jobs = r_agg.json()
+        else:
+            use_api = False
+            
+        r_dir = requests.get(
+            'https://mwcgwvlychlilimzawya.supabase.co/rest/v1/job_offer?select=*&status=eq.active',
+            headers=headers,
+            timeout=12
+        )
+        if r_dir.status_code == 200:
+            direct_jobs = r_dir.json()
+    except Exception as e:
+        logger.warning(f"Failed to fetch QA Board REST API: {e}")
+        use_api = False
+        
+    if use_api and (aggregated_jobs or direct_jobs):
+        logger.info(f"QA Board API returned {len(direct_jobs)} direct, {len(aggregated_jobs)} aggregated offers.")
+        
+        # Process aggregated jobs (partner postings from solid.jobs featured on QA Board)
+        for j in aggregated_jobs:
+            title = (j.get('title') or '').strip()
+            if not title:
+                continue
+                
+            job_url = (j.get('apply_url') or '').strip()
+            if not job_url or job_url in seen_urls:
+                continue
+            seen_urls.add(job_url)
+            
+            record_scanned("QABoard", title)
+            
+            company = (j.get('company_name') or 'Quality Island Partner').strip()
+            city = (j.get('city') or '').strip()
+            address = (j.get('address') or '').strip()
+            work_mode = (j.get('work_mode') or '').strip()
+            subcategory = (j.get('subcategory') or '').strip()
+            emp_type = (j.get('employment_type') or '').strip()
+            
+            # Title filter (Strict Manual QA only)
+            if not parsers.is_title_valid(title):
+                logger.info(f"  REJECTED (QABoard) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("QABoard", title)
+                else:
+                    record_rejected_other("QABoard", title, "Title")
+                continue
+                
+            # Automation check
+            if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                logger.info(f"  REJECTED (QABoard) automation: {title}")
+                record_rejected_automation("QABoard", title)
+                continue
+                
+            # Location check: Remote OR Pomerania
+            is_remote = work_mode.lower() == 'remote' or 'zdal' in work_mode.lower()
+            is_pom = bool(parsers.POMERANIA_REGEX.search(city)) or bool(parsers.POMERANIA_REGEX.search(address))
+            
+            if not is_remote and not is_pom:
+                logger.info(f"  REJECTED (QABoard) location: {title} ({city}, {work_mode})")
+                record_rejected_other("QABoard", title, "Location")
+                continue
+                
+            # City display
+            if is_pom and is_remote:
+                city_display = "Gdańsk / Remote"
+            elif is_pom:
+                city_display = f"{city} (Hybrid)" if work_mode.lower() == 'hybrid' else (city or "Gdańsk")
+            else:
+                city_display = "Remote"
+                
+            # Salary
+            pay = "Not given"
+            sal = j.get('salary') or {}
+            sal_min = sal.get('min')
+            sal_max = sal.get('max')
+            curr = sal.get('currency', 'PLN')
+            sal_type = sal.get('type', 'monthly')
+            if sal_min and sal_max:
+                pay = f"{int(sal_min)} - {int(sal_max)} {curr}"
+                if sal_type == 'hourly':
+                    pay += " / h"
+            elif sal_min:
+                pay = f"od {int(sal_min)} {curr}"
+                if sal_type == 'hourly':
+                    pay += " / h"
+            elif sal_max:
+                pay = f"do {int(sal_max)} {curr}"
+                if sal_type == 'hourly':
+                    pay += " / h"
+                    
+            valid_from = (j.get('valid_from') or j.get('imported_at') or '')[:10]
+            contract_type = "B2B" if emp_type.upper() == "B2B" else ("UoP" if emp_type.upper() == "UOP" else "")
+            
+            job_item = {
+                'title': title,
+                'company': company,
+                'url': job_url,
+                'city': city_display,
+                'pay': pay,
+                'published_at': valid_from,
+                'contract_type': contract_type,
+                'source': 'QABoard'
+            }
+            jobs.append(job_item)
+            record_accepted("QABoard", title)
+            logger.info(f"  ACCEPTED (QABoard): {title} @ {company} | {city_display} | {pay}")
+            
+        # Process direct jobs
+        for j in direct_jobs:
+            title = (j.get('title') or '').strip()
+            slug = (j.get('slug') or '').strip()
+            if not title or not slug:
+                continue
+                
+            job_url = f"https://qaboard.pl/jobs/{slug}"
+            if job_url in seen_urls:
+                continue
+            seen_urls.add(job_url)
+            
+            record_scanned("QABoard", title)
+            
+            company = (j.get('company_name') or 'Quality Island').strip()
+            cities = j.get('cities') or []
+            work_modes = j.get('work_modes') or []
+            modes_str = " ".join(work_modes).lower()
+            cities_str = " ".join(cities)
+            
+            if not parsers.is_title_valid(title):
+                logger.info(f"  REJECTED (QABoard) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("QABoard", title)
+                else:
+                    record_rejected_other("QABoard", title, "Title")
+                continue
+                
+            if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                logger.info(f"  REJECTED (QABoard) automation: {title}")
+                record_rejected_automation("QABoard", title)
+                continue
+                
+            is_remote = 'remote' in modes_str or 'zdal' in modes_str
+            is_pom = bool(parsers.POMERANIA_REGEX.search(cities_str))
+            
+            if not is_remote and not is_pom:
+                logger.info(f"  REJECTED (QABoard) location: {title}")
+                record_rejected_other("QABoard", title, "Location")
+                continue
+                
+            if is_pom and is_remote:
+                city_display = "Gdańsk / Remote"
+            elif is_pom:
+                city_display = "Gdańsk (Hybrid)" if 'hybrid' in modes_str else "Gdańsk"
+            else:
+                city_display = "Remote"
+                
+            sal = j.get('salary') or {}
+            sal_min = sal.get('min')
+            sal_max = sal.get('max')
+            curr = sal.get('currency', 'PLN')
+            sal_type = sal.get('type', 'monthly')
+            pay = "Not given"
+            if sal_min and sal_max:
+                pay = f"{int(sal_min)} - {int(sal_max)} {curr}"
+                if sal_type == 'hourly':
+                    pay += " / h"
+            elif sal_min:
+                pay = f"od {int(sal_min)} {curr}"
+                if sal_type == 'hourly':
+                    pay += " / h"
+            elif sal_max:
+                pay = f"do {int(sal_max)} {curr}"
+                if sal_type == 'hourly':
+                    pay += " / h"
+                    
+            created_at = (j.get('created_at') or '')[:10]
+            contract_types = j.get('contract_types') or []
+            contract_type = " / ".join(contract_types) if contract_types else ""
+            
+            job_item = {
+                'title': title,
+                'company': company,
+                'url': job_url,
+                'city': city_display,
+                'pay': pay,
+                'published_at': created_at,
+                'contract_type': contract_type,
+                'source': 'QABoard'
+            }
+            jobs.append(job_item)
+            record_accepted("QABoard", title)
+            logger.info(f"  ACCEPTED (QABoard): {title} @ {company} | {city_display} | {pay}")
+            
+        return jobs
+        
+    # 2. Browser-based fallback (with Manual Tester filter clicked!)
+    if browser:
+        page = browser.new_page()
         try:
-            page.goto(list_url, wait_until="domcontentloaded", timeout=25000)
+            page.goto("https://qaboard.pl/jobs", wait_until="domcontentloaded", timeout=25000)
             page.wait_for_timeout(2000)
             dismiss_cookie_consent(page)
             
+            # Explicitly click the Manual Tester filter on the website!
+            try:
+                manual_label = page.locator('label:has-text("Manual Tester")')
+                if manual_label.count() > 0:
+                    manual_label.first.click()
+                    page.wait_for_timeout(2000)
+            except Exception as e_filter:
+                logger.warning(f"Could not click Manual Tester label: {e_filter}")
+                
+            # Scroll down to load all listings
+            scroll_count = 8 if deep else 4
+            for _ in range(scroll_count):
+                page.mouse.wheel(0, 1500)
+                page.wait_for_timeout(1000)
+                
             html = page.content()
             soup = BeautifulSoup(html, 'html.parser')
             articles = soup.find_all('article')
-            if not articles:
-                break
-                
+            
             for art in articles:
                 card_text = art.get_text(separator=' | ', strip=True).replace('\u2013', '-').replace('\u2014', '-').replace('–', '-')
-                
                 job_url = ""
                 for a in art.find_all('a', href=True):
                     href = a['href']
@@ -1708,8 +1931,7 @@ def scrape_qaboard(browser, deep=False):
                     title = raw_title
                     
                 record_scanned("QABoard", title or job_url)
-                    
-                # 1. Title filter (Strict Manual QA only)
+                
                 if not parsers.is_title_valid(title):
                     logger.info(f"  REJECTED (QABoard) title: {title}")
                     if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
@@ -1718,19 +1940,16 @@ def scrape_qaboard(browser, deep=False):
                         record_rejected_other("QABoard", title, "Title")
                     continue
                     
-                # 2. Automation tools in card text
                 if parsers.AUTOMATION_TOOLS_REGEX.search(card_text) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', card_text):
                     logger.info(f"  REJECTED (QABoard) automation: {title}")
                     record_rejected_automation("QABoard", title)
                     continue
                     
-                # 3. Location filter: Remote OR Pomerania
                 is_remote = bool(re.search(r'(?i)\bzdalnie\b|\bremote\b', card_text))
                 is_pomerania = bool(parsers.POMERANIA_REGEX.search(card_text))
                 is_other_city = bool(re.search(r'(?i)\b(warszaw\w*|warsaw|krak[óo]w|krakow|wroc[łl]aw|wroclaw|pozna[ńn]|poznan|katowic\w*|silesia|[łl][óo]d[źz]|lodz|szczecin|lublin|bia[łl]ystok|rzesz[óo]w|bydgoszcz|toru[ńn])\b', card_text))
                 is_hybrid = bool(re.search(r'(?i)\bhybryd\w*|hybrid\b', card_text))
                 
-                # Reject if hybrid/onsite in non-Pomerania city
                 if is_other_city and (is_hybrid or not is_remote) and not is_pomerania:
                     logger.info(f"  REJECTED (QABoard) non-Pomerania location: {title} @ {card_text[:80]}")
                     record_rejected_other("QABoard", title, "Location")
@@ -1741,7 +1960,6 @@ def scrape_qaboard(browser, deep=False):
                     record_rejected_other("QABoard", title, "Location")
                     continue
                     
-                # City display
                 if is_pomerania and is_remote:
                     city_display = "Gdańsk / Remote"
                 elif is_pomerania:
@@ -1749,12 +1967,13 @@ def scrape_qaboard(browser, deep=False):
                 else:
                     city_display = "Remote"
                     
-                company = "Quality Island"
-                if "ITFS" in card_text:
-                    company = "ITFS"
-                elif "Solid.Jobs" in card_text:
-                    company = "Quality Island Partner"
-                    
+                company = "Quality Island Partner"
+                for span in art.find_all(['span', 'p', 'div']):
+                    txt = span.get_text(strip=True)
+                    if txt and len(txt) < 35 and not any(k in txt.lower() for k in ['b2b', 'uop', 'pln', 'zdalnie', 'hybrydowo', 'manual', 'senior', 'mid', 'junior', 'rekomendowane']):
+                        company = txt
+                        break
+                        
                 pay = "Not given"
                 m_sal = re.search(r'Wynagrodzenie\s*\|\s*([\d\s,.-]+)\s*\|\s*(PLN/[hm]|zł/[hm]|PLN|EUR|USD)', card_text, re.I)
                 if m_sal:
@@ -1780,10 +1999,10 @@ def scrape_qaboard(browser, deep=False):
                 record_accepted("QABoard", title)
                 logger.info(f"  ACCEPTED (QABoard): {title} @ {company} | {city_display} | {pay}")
         except Exception as e:
-            logger.error(f"Error scraping QABoard page {page_num}: {e}")
-            break
+            logger.error(f"Error scraping QABoard via browser: {e}")
+        finally:
+            page.close()
             
-    page.close()
     return jobs
 
 

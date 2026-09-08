@@ -92,6 +92,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def create_stealth_context(browser):
+    """Creates a browser context configured to evade bot detection / WAF (Cloudflare/Datadome/Akamai)."""
+    context = browser.new_context(
+        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        locale='pl-PL',
+        viewport={'width': 1366, 'height': 768},
+        extra_http_headers={
+            'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Sec-Ch-Ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"'
+        }
+    )
+    context.add_init_script("""
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined
+        });
+        window.navigator.chrome = {
+            runtime: {}
+        };
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['pl-PL', 'pl', 'en-US', 'en']
+        });
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5]
+        });
+    """)
+    return context
+
+
 def dismiss_cookie_consent(page):
     """Try to click cookie/consent popups that block SPA rendering."""
     for selector in [
@@ -556,34 +586,32 @@ def scrape_protocol(browser, deep=False):
     logger.info("Scraping theprotocol.it...")
     update_progress("Protocol", "", "Scanning theprotocol.it listings...")
     jobs = []
-    page = browser.new_page()
+    context = create_stealth_context(browser)
+    page = context.new_page()
     max_urls = 50 if deep else 15
-    # Search with QA/testing keywords + location filters
-    # Use both unfiltered and location-filtered searches to catch all remote & Tricity jobs
     all_urls = []
     base = "https://theprotocol.it/filtry"
     
-    # 1. Base keyword and category searches (includes all remote & multi-location jobs)
-    base_searches = [
+    # 1. Targeted keyword and category searches
+    search_queries = [
+        f"{base}/testing;t",
         f"{base}/tester;kw",
         f"{base}/qa;kw",
-        f"{base}/testing;t",
-        f"{base}/tester%20manualny;kw",
-        f"{base}/manual%20tester;kw",
-        f"{base}/quality%20assurance;kw"
+        f"{base}/testing;t/praca-zdalna;wm",
+        f"{base}/testing;t/gdansk;wp",
     ]
-    for url in base_searches:
-        all_urls += get_job_urls(page, url, "szczegoly", "https://theprotocol.it", max_urls)
+    if deep:
+        search_queries.extend([
+            f"{base}/tester%20manualny;kw",
+            f"{base}/quality%20assurance;kw",
+            f"{base}/testing;t/gdynia;wp",
+            f"{base}/testing;t/sopot;wp"
+        ])
+    for s_url in search_queries:
+        all_urls += get_job_urls(page, s_url, "szczegoly", "https://theprotocol.it", max_urls)
+        page.wait_for_timeout(1000)
         
-    # 2. Location-specific searches
-    locations = ["gdansk;wp", "gdynia;wp", "sopot;wp", "praca-zdalna;wm"]
-    keywords = ["testing;t", "tester;kw", "qa;kw"]
-    for kw in keywords:
-        for loc in locations:
-            url = f"{base}/{kw}/{loc}"
-            all_urls += get_job_urls(page, url, "szczegoly", "https://theprotocol.it", max_urls)
-    
-    unique_urls = list(set(all_urls))
+    unique_urls = list(dict.fromkeys(all_urls))
     logger.info(f"Protocol total unique URLs to visit: {len(unique_urls)}")
     
     for url in unique_urls:
@@ -591,6 +619,11 @@ def scrape_protocol(browser, deep=False):
             page.goto(url, wait_until="domcontentloaded", timeout=25000)
             page.wait_for_timeout(1500)
             dismiss_cookie_consent(page)
+            
+            # Check for Cloudflare / verification screen
+            if "just a moment" in page.title().lower() or "are you a human" in page.content().lower():
+                logger.info(f"  Cloudflare verification detected on {url[:60]}... waiting up to 6s...")
+                page.wait_for_timeout(6000)
             
             # Wait for Protocol to render
             try:
@@ -725,6 +758,7 @@ def scrape_protocol(browser, deep=False):
             logger.error(f"Error scraping Protocol {url[:60]}...: {e}")
             
     page.close()
+    context.close()
     return jobs
 
 
@@ -1653,9 +1687,17 @@ def run_scraper(portal="ALL", deep=False):
     
     all_raw_jobs = []
     
-    # headless=False bypasses WAF / Cloudflare blocks
+    # headless=False with stealth flags to bypass WAF / Cloudflare blocks
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(
+            headless=False,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-infobars',
+                '--disable-dev-shm-usage',
+            ]
+        )
         
         if portal in ["ALL", "JJIT"]:
             all_raw_jobs.extend(scrape_jjit(browser, deep))

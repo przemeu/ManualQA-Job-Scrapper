@@ -1497,7 +1497,13 @@ def scrape_linkedin(browser, deep=False):
             else:
                 m_pay = parsers.PAY_REGEX.search(desc)
                 if m_pay:
-                    pay = m_pay.group(0).strip()
+                    end_idx = min(len(desc), m_pay.end() + 35)
+                    raw_context = desc[m_pay.start():end_idx]
+                    cleaned_pay = parsers.clean_pay(raw_context)
+                    if cleaned_pay and cleaned_pay != "Not given":
+                        pay = cleaned_pay
+                    else:
+                        pay = m_pay.group(0).strip()
                     
             pub_date = parsers.format_date_str(item['pub_date'] or str(ld_data.get('datePosted') or ''))
             

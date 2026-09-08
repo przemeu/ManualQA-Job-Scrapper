@@ -100,13 +100,13 @@ def clean_pay(val: str) -> str:
     
     # 1. Detect period / time unit
     period = ''
-    if any(k in lower for k in ['godzinow', '/ hour', '/ h', '/h', 'godz', 'per hour']):
+    if any(k in lower for k in ['godzinow', '/ hour', '/ h', '/h', 'godz', 'per hour', '/hour', 'hourly']):
         period = '/ h'
-    elif any(k in lower for k in ['dziennie', 'dzień', 'dzien', '/ day', '/ d', '/d', 'per day']):
+    elif any(k in lower for k in ['dziennie', 'dzień', 'dzien', '/ day', '/ d', '/d', 'per day', '/day', 'daily', ' md', '/md', 'manday', 'man-day', 'm-d']):
         period = '/ d'
-    elif any(k in lower for k in ['rocznie', 'rok', '/ year', '/ y', '/y', 'per year', 'annual', 'annually']):
+    elif any(k in lower for k in ['rocznie', 'rok', '/ year', '/ y', '/y', 'per year', '/year', 'annual', 'annually']):
         period = '/ y'
-    elif any(k in lower for k in ['miesi', '/ month', '/ m', '/m', 'per month']):
+    elif any(k in lower for k in ['miesi', '/ month', '/ m', '/m', 'per month', '/month', 'monthly']):
         period = '/ m'
         
     # 2. Detect currency
@@ -126,7 +126,7 @@ def clean_pay(val: str) -> str:
     s = re.sub(r'(?i)brutto|netto', '', s)
     s = re.sub(r'(?i)oblicz\s*[\"\']?na\s*r[eę]k[eę][\"\']?', '', s)
     s = re.sub(r'(?i)oblicz\s*netto', '', s)
-    s = re.sub(r'(?i)miesięcznie|miesiecznie|godzinowo|dziennie|rocznie|month|hour|year|day|annual|annually', '', s)
+    s = re.sub(r'(?i)miesięcznie|miesiecznie|godzinowo|dziennie|rocznie|month|hour|year|day|annual|annually|\bmd\b|manday|man-day', '', s)
     s = re.sub(r'(?i)pln|eur|usd|gbp|zł|zl', '', s)
     s = re.sub(r'[/\\()]', '', s)
     s = s.replace('"', '').replace("'", '')
@@ -151,6 +151,17 @@ def clean_pay(val: str) -> str:
         elif len(parts) == 2 and parts[0]:
             num_part = parts[0]
             
+    if not period and curr == 'PLN':
+        nums_only = [float(x) for x in re.findall(r'\b\d+\b', num_part.replace(' ', '')) if float(x) > 5]
+        if nums_only:
+            avg_val = sum(nums_only) / len(nums_only)
+            if avg_val < 300:
+                period = '/ h'
+            elif 300 <= avg_val <= 2500:
+                period = '/ d'
+            elif avg_val >= 80000:
+                period = '/ y'
+
     res = f"{num_part} {curr}"
     if period:
         p_map = {'/ y': ' / rok', '/ m': ' / mies.', '/ h': ' / godz.', '/ d': ' / dzień'}

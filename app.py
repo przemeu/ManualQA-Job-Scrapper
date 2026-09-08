@@ -507,9 +507,9 @@ def parse_salary_range(pay: str):
     is_usd = 'USD' in pay or '$' in pay
     eur_rate = 4.3 if is_eur else (4.0 if is_usd else 1.0)
     lower = pay.lower()
-    is_hourly = any(x in lower for x in ['godzinowo', '/ hour', '/ h', '/h', 'godz', 'per hour'])
-    is_daily = any(x in lower for x in ['dziennie', '/ day', '/ d', '/d', 'dzień', 'dzien', 'per day'])
-    is_yearly = any(x in lower for x in ['rocznie', '/ year', '/ y', '/y', 'rok', 'annual', 'annually', 'per year'])
+    is_hourly = any(x in lower for x in ['godzinowo', '/ hour', '/ h', '/h', 'godz', 'per hour', '/hour', 'hourly'])
+    is_daily = any(x in lower for x in ['dziennie', '/ day', '/ d', '/d', 'dzień', 'dzien', 'per day', '/day', 'daily', ' md', '/md', 'manday', 'man-day'])
+    is_yearly = any(x in lower for x in ['rocznie', '/ year', '/ y', '/y', 'rok', 'annual', 'annually', 'per year', '/year'])
     
     s = pay.replace('\xa0', ' ').replace(',', '.')
     cleaned = re.sub(r'(\d+)\s+(\d{3})', r'\1\2', s)
@@ -520,9 +520,9 @@ def parse_salary_range(pay: str):
     min_val = min(floats)
     max_val = max(floats)
     mult = 1.0
-    if is_hourly or (min_val < 300 and not is_daily and not is_eur and not is_usd):
+    if is_hourly or (min_val < 300 and not is_daily and not is_eur and not is_usd and 'mies' not in lower and 'month' not in lower):
         mult = 168.0
-    elif is_daily or (300 <= min_val <= 2500 and ('dzien' in lower or '/ d' in lower or '/d' in lower)):
+    elif is_daily or (300 <= min_val <= 2500 and not is_eur and not is_usd and not is_yearly and 'mies' not in lower and 'month' not in lower):
         mult = 21.0
     elif is_yearly or (min_val > 100000 and not is_eur and not is_usd) or ((is_eur or is_usd) and min_val >= 20000):
         mult = 1.0 / 12.0

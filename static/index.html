@@ -30,6 +30,40 @@
             max-height: calc(100vh - 215px);
             min-height: 280px;
         }
+        .swimlane-lane {
+            min-width: 250px;
+            max-width: 850px;
+            position: relative;
+        }
+        .lane-resizer {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: -6px;
+            width: 14px;
+            cursor: col-resize;
+            z-index: 25;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: none;
+        }
+        .lane-resizer::after {
+            content: '';
+            width: 3px;
+            height: 36px;
+            border-radius: 9999px;
+            background-color: #cbd5e1;
+            transition: all 0.15s ease;
+        }
+        .lane-resizer:hover::after,
+        .lane-resizer.resizing::after {
+            background-color: #6366f1;
+            width: 4px;
+            height: 100%;
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.45);
+        }
         .drag-over-active {
             background-color: #e0e7ff !important;
             border-color: #6366f1 !important;
@@ -296,25 +330,28 @@
             <div class="flex flex-col gap-3.5" id="jobList"></div>
         </div>
 
-        <!-- JIRA SWIMLANES / KANBAN BOARD CONTAINER (FULL WIDTH 6-COLUMN RESPONSIVE GRID) -->
+        <!-- JIRA SWIMLANES / KANBAN BOARD CONTAINER (FULL WIDTH RESPONSIVE FLEX WITH RESIZABLE LANES) -->
         <div id="boardViewContainer" class="hidden w-full h-full flex flex-col">
             <!-- Board Subheader -->
             <div class="flex items-center justify-between mb-3 px-1 flex-shrink-0">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                         <i class="fas fa-columns text-indigo-500"></i> Accepted Pipeline Swimlanes
                     </span>
-                    <span class="text-[11px] text-slate-400 font-medium hidden md:inline">• Drag & drop cards or click arrows to move stages</span>
+                    <span class="text-[11px] text-slate-400 font-medium hidden md:inline">• Drag cards between stages • Drag lane edges to resize for readability</span>
+                    <button onclick="resetLaneWidths()" class="text-[11px] text-slate-500 hover:text-indigo-600 font-bold flex items-center gap-1 transition-colors px-2.5 py-0.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs hover:border-indigo-200 cursor-pointer ml-1" title="Reset all swimlane lanes to equal width">
+                        <i class="fas fa-arrows-left-right-to-line text-[10px] text-indigo-500"></i> Reset Widths
+                    </button>
                 </div>
                 <span id="boardTotalCount" class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">0 Accepted Offers</span>
             </div>
 
-            <!-- 6 Full-Width Responsive Swimlane Columns -->
+            <!-- Full-Width Responsive Swimlane Columns with Resizable Lanes -->
             <div class="w-full flex-1 overflow-x-auto pb-4 custom-scrollbar">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 w-full min-w-[1100px] xl:min-w-0 items-start">
+                <div id="swimlaneColumnsContainer" class="flex gap-3.5 w-full min-w-full items-start">
                     
                     <!-- Column 1: To Apply -->
-                    <div class="bg-slate-100/90 rounded-2xl p-3 border border-slate-200/90 flex flex-col transition-all duration-150" 
+                    <div id="lane-col-To Apply" data-stage="To Apply" class="swimlane-lane bg-slate-100/90 rounded-2xl p-3 border border-slate-200/90 flex flex-col flex-1 min-w-[250px] shadow-2xs" 
                          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'To Apply')">
                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80 sticky top-0 bg-slate-100/90 z-10">
                             <div class="flex items-center gap-2">
@@ -324,10 +361,11 @@
                             <span id="count-col-To Apply" class="text-[11px] font-bold bg-white text-slate-700 px-2 py-0.2 rounded-full shadow-2xs border border-slate-200/60">0</span>
                         </div>
                         <div id="cards-col-To Apply" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                        <div class="lane-resizer" onmousedown="initResizeLane(event, 'To Apply')" ondblclick="resetSingleLaneWidth('To Apply')" title="Drag to resize lane (double-click to reset)"></div>
                     </div>
 
                     <!-- Column 2: Applied -->
-                    <div class="bg-purple-50/60 rounded-2xl p-3 border border-purple-200/80 flex flex-col transition-all duration-150"
+                    <div id="lane-col-Applied" data-stage="Applied" class="swimlane-lane bg-purple-50/60 rounded-2xl p-3 border border-purple-200/80 flex flex-col flex-1 min-w-[250px] shadow-2xs"
                          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Applied')">
                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-purple-200/80 sticky top-0 bg-purple-50/90 z-10">
                             <div class="flex items-center gap-2">
@@ -337,10 +375,11 @@
                             <span id="count-col-Applied" class="text-[11px] font-bold bg-white text-purple-700 px-2 py-0.2 rounded-full shadow-2xs border border-purple-200/60">0</span>
                         </div>
                         <div id="cards-col-Applied" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                        <div class="lane-resizer" onmousedown="initResizeLane(event, 'Applied')" ondblclick="resetSingleLaneWidth('Applied')" title="Drag to resize lane (double-click to reset)"></div>
                     </div>
 
                     <!-- Column 3: Recruiter Screen -->
-                    <div class="bg-blue-50/60 rounded-2xl p-3 border border-blue-200/80 flex flex-col transition-all duration-150"
+                    <div id="lane-col-Recruiter Screen" data-stage="Recruiter Screen" class="swimlane-lane bg-blue-50/60 rounded-2xl p-3 border border-blue-200/80 flex flex-col flex-1 min-w-[250px] shadow-2xs"
                          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Recruiter Screen')">
                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-blue-200/80 sticky top-0 bg-blue-50/90 z-10">
                             <div class="flex items-center gap-2">
@@ -350,10 +389,11 @@
                             <span id="count-col-Recruiter Screen" class="text-[11px] font-bold bg-white text-blue-700 px-2 py-0.2 rounded-full shadow-2xs border border-blue-200/60">0</span>
                         </div>
                         <div id="cards-col-Recruiter Screen" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                        <div class="lane-resizer" onmousedown="initResizeLane(event, 'Recruiter Screen')" ondblclick="resetSingleLaneWidth('Recruiter Screen')" title="Drag to resize lane (double-click to reset)"></div>
                     </div>
 
                     <!-- Column 4: Tech Interview -->
-                    <div class="bg-amber-50/60 rounded-2xl p-3 border border-amber-200/80 flex flex-col transition-all duration-150"
+                    <div id="lane-col-Tech Interview" data-stage="Tech Interview" class="swimlane-lane bg-amber-50/60 rounded-2xl p-3 border border-amber-200/80 flex flex-col flex-1 min-w-[250px] shadow-2xs"
                          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Tech Interview')">
                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-amber-200/80 sticky top-0 bg-amber-50/90 z-10">
                             <div class="flex items-center gap-2">
@@ -363,10 +403,11 @@
                             <span id="count-col-Tech Interview" class="text-[11px] font-bold bg-white text-amber-700 px-2 py-0.2 rounded-full shadow-2xs border border-amber-200/60">0</span>
                         </div>
                         <div id="cards-col-Tech Interview" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                        <div class="lane-resizer" onmousedown="initResizeLane(event, 'Tech Interview')" ondblclick="resetSingleLaneWidth('Tech Interview')" title="Drag to resize lane (double-click to reset)"></div>
                     </div>
 
                     <!-- Column 5: Offer -->
-                    <div class="bg-emerald-50/60 rounded-2xl p-3 border border-emerald-200/80 flex flex-col transition-all duration-150"
+                    <div id="lane-col-Offer" data-stage="Offer" class="swimlane-lane bg-emerald-50/60 rounded-2xl p-3 border border-emerald-200/80 flex flex-col flex-1 min-w-[250px] shadow-2xs"
                          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Offer')">
                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-emerald-200/80 sticky top-0 bg-emerald-50/90 z-10">
                             <div class="flex items-center gap-2">
@@ -376,10 +417,11 @@
                             <span id="count-col-Offer" class="text-[11px] font-bold bg-white text-emerald-700 px-2 py-0.2 rounded-full shadow-2xs border border-emerald-200/60">0</span>
                         </div>
                         <div id="cards-col-Offer" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                        <div class="lane-resizer" onmousedown="initResizeLane(event, 'Offer')" ondblclick="resetSingleLaneWidth('Offer')" title="Drag to resize lane (double-click to reset)"></div>
                     </div>
 
                     <!-- Column 6: Rejected -->
-                    <div class="bg-rose-50/60 rounded-2xl p-3 border border-rose-200/80 flex flex-col transition-all duration-150"
+                    <div id="lane-col-Rejected" data-stage="Rejected" class="swimlane-lane bg-rose-50/60 rounded-2xl p-3 border border-rose-200/80 flex flex-col flex-1 min-w-[250px] shadow-2xs"
                          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Rejected')">
                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-rose-200/80 sticky top-0 bg-rose-50/90 z-10">
                             <div class="flex items-center gap-2">
@@ -389,6 +431,7 @@
                             <span id="count-col-Rejected" class="text-[11px] font-bold bg-white text-rose-700 px-2 py-0.2 rounded-full shadow-2xs border border-rose-200/60">0</span>
                         </div>
                         <div id="cards-col-Rejected" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                        <div class="lane-resizer" onmousedown="initResizeLane(event, 'Rejected')" ondblclick="resetSingleLaneWidth('Rejected')" title="Drag to resize lane (double-click to reset)"></div>
                     </div>
 
                 </div>
@@ -658,6 +701,7 @@
 
                 if (listCont) listCont.classList.add('hidden');
                 if (boardCont) boardCont.classList.remove('hidden');
+                restoreLaneWidths();
             } else {
                 if (boardBtn) {
                     boardBtn.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
@@ -1263,7 +1307,7 @@
                     const isRejected = (stage === 'Rejected');
                     card.innerHTML = `
                         <div class="flex items-start justify-between gap-1.5">
-                            <a href="${job.url}" target="_blank" class="font-extrabold text-slate-900 hover:text-indigo-600 line-clamp-2 leading-snug transition-colors" title="${job.title}">
+                            <a href="${job.url}" target="_blank" class="font-extrabold text-slate-900 hover:text-indigo-600 line-clamp-3 leading-snug transition-colors" title="${job.title}">
                                 ${job.title}
                             </a>
                             <div class="flex items-center gap-1 flex-shrink-0">
@@ -1279,7 +1323,7 @@
                         </div>
 
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            ${job.company ? `<span class="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-[10px] truncate max-w-[130px] shadow-2xs border border-slate-200/60"><i class="fas fa-building text-slate-400 mr-1"></i>${job.company}</span>` : ''}
+                            ${job.company ? `<span class="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-[10px] truncate max-w-[260px] shadow-2xs border border-slate-200/60"><i class="fas fa-building text-slate-400 mr-1"></i>${job.company}</span>` : ''}
                             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${portalBadgeClass}">${job.source}</span>
                             ${job.city ? `<span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200/60"><i class="fas fa-map-marker-alt mr-0.5 text-blue-500"></i>${job.city}</span>` : ''}
                             ${getContractTypeBadge(job, true)}
@@ -1299,7 +1343,7 @@
                             ` : ''}
                             ${job.salary_asked ? `<div class="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200/60"><i class="fas fa-hand-holding-usd mr-1 text-purple-500"></i>Asked: ${job.salary_asked}</div>` : ''}
                             ${job.interview_date ? `<div class="font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/60"><i class="far fa-calendar-check mr-1 text-indigo-500"></i>${job.interview_date.replace('T', ' ')}</div>` : ''}
-                            ${job.notes ? `<div class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200/60 line-clamp-2 italic"><i class="far fa-comment-dots text-slate-400 mr-1"></i>${job.notes}</div>` : ''}
+                            ${job.notes ? `<div class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200/60 line-clamp-5 italic"><i class="far fa-comment-dots text-slate-400 mr-1"></i>${job.notes}</div>` : ''}
                         </div>
 
                         <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
@@ -1371,6 +1415,129 @@
             }
 
             await updatePipelineStage(jobId, targetStage, false);
+        }
+
+        // ==========================================
+        // SWIMLANE LANE RESIZING LOGIC
+        // ==========================================
+        let activeResizeStage = null;
+        let resizeStartX = 0;
+        let resizeStartWidth = 0;
+        let activeResizerEl = null;
+
+        function initResizeLane(event, stage) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const lane = document.getElementById(`lane-col-${stage}`);
+            if (!lane) return;
+
+            activeResizeStage = stage;
+            activeResizerEl = event.currentTarget;
+            if (activeResizerEl) activeResizerEl.classList.add('resizing');
+
+            resizeStartX = event.clientX;
+            resizeStartWidth = lane.getBoundingClientRect().width;
+
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            window.addEventListener('mousemove', onResizeLaneMove);
+            window.addEventListener('mouseup', stopResizeLane);
+        }
+
+        function onResizeLaneMove(event) {
+            if (!activeResizeStage) return;
+
+            const lane = document.getElementById(`lane-col-${activeResizeStage}`);
+            if (!lane) return;
+
+            const diff = event.clientX - resizeStartX;
+            const newWidth = Math.max(250, Math.min(850, Math.round(resizeStartWidth + diff)));
+
+            lane.style.flex = `0 0 ${newWidth}px`;
+            lane.style.width = `${newWidth}px`;
+        }
+
+        function stopResizeLane(event) {
+            if (!activeResizeStage) return;
+
+            if (activeResizerEl) {
+                activeResizerEl.classList.remove('resizing');
+                activeResizerEl = null;
+            }
+
+            activeResizeStage = null;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+
+            window.removeEventListener('mousemove', onResizeLaneMove);
+            window.removeEventListener('mouseup', stopResizeLane);
+
+            saveLaneWidths();
+        }
+
+        function saveLaneWidths() {
+            try {
+                const widths = {};
+                STAGES.forEach(stage => {
+                    const lane = document.getElementById(`lane-col-${stage}`);
+                    if (lane && lane.style.width) {
+                        const parsed = parseInt(lane.style.width, 10);
+                        if (!isNaN(parsed) && parsed >= 250) {
+                            widths[stage] = parsed;
+                        }
+                    }
+                });
+                localStorage.setItem('swimlane_lane_widths', JSON.stringify(widths));
+            } catch (e) {
+                console.warn("Could not save swimlane lane widths to localStorage", e);
+            }
+        }
+
+        function restoreLaneWidths() {
+            try {
+                const raw = localStorage.getItem('swimlane_lane_widths');
+                if (!raw) return;
+                const widths = JSON.parse(raw);
+                if (!widths || typeof widths !== 'object') return;
+
+                STAGES.forEach(stage => {
+                    const w = widths[stage];
+                    if (w && typeof w === 'number' && w >= 240 && w <= 850) {
+                        const lane = document.getElementById(`lane-col-${stage}`);
+                        if (lane) {
+                            lane.style.flex = `0 0 ${w}px`;
+                            lane.style.width = `${w}px`;
+                        }
+                    }
+                });
+            } catch (e) {
+                console.warn("Could not restore swimlane lane widths from localStorage", e);
+            }
+        }
+
+        function resetLaneWidths() {
+            try {
+                localStorage.removeItem('swimlane_lane_widths');
+            } catch (e) {}
+
+            STAGES.forEach(stage => {
+                const lane = document.getElementById(`lane-col-${stage}`);
+                if (lane) {
+                    lane.style.flex = '';
+                    lane.style.width = '';
+                }
+            });
+        }
+
+        function resetSingleLaneWidth(stage) {
+            const lane = document.getElementById(`lane-col-${stage}`);
+            if (lane) {
+                lane.style.flex = '';
+                lane.style.width = '';
+            }
+            saveLaneWidths();
         }
 
         // ==========================================
@@ -1929,6 +2096,7 @@
                     switcher.classList.remove('hidden');
                     switcher.classList.add('flex');
                 }
+                setViewMode('board');
             } else {
                 if (switcher) {
                     switcher.classList.add('hidden');
@@ -1937,7 +2105,6 @@
                 // Force list view on all non-accepted tabs
                 if (viewMode === 'board') {
                     setViewMode('list');
-                    return;
                 }
             }
 
@@ -2162,6 +2329,7 @@
         }
 
         // Initial load
+        restoreLaneWidths();
         fetchJobs();
         loadSettings();
     </script>

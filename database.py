@@ -38,7 +38,7 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # column already exists
     try:
-        cursor.execute("ALTER TABLE jobs ADD COLUMN stage TEXT DEFAULT 'Applied'")
+        cursor.execute("ALTER TABLE jobs ADD COLUMN stage TEXT DEFAULT 'To Apply'")
     except sqlite3.OperationalError:
         pass  # column already exists
     try:
@@ -57,6 +57,14 @@ def init_db():
         cursor.execute("ALTER TABLE jobs ADD COLUMN company TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass  # column already exists
+    try:
+        cursor.execute("ALTER TABLE jobs ADD COLUMN is_manual INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    try:
+        cursor.execute("ALTER TABLE jobs ADD COLUMN contract_type TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
     # Create settings table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS settings (
@@ -67,8 +75,71 @@ def init_db():
     conn.commit()
     conn.close()
     
-    # Automatically backfill company for legacy records if empty
+    # Automatically backfill company, clean pay, and contract types for legacy records
     backfill_empty_companies()
+    backfill_clean_pay()
+    backfill_contract_types()
+
+def infer_contract_type(title="", url="", source="", pay="", full_text=""):
+    import re
+    combined = f"{title} {url} {pay} {full_text}".lower()
+    
+    has_b2b = bool(re.search(r'(?i)\b(b2b|kontrakt|faktura|faktur[eę]|vat)\b', combined))
+    has_uop = bool(re.search(r'(?i)\b(uop|umow[ae]\s*o\s*prac[eę]|o\s*prac[eę]|permanent|etat|employment)\b', combined))
+    
+    pay_lower = pay.lower()
+    if '/ h' in pay_lower or '/h' in pay_lower or '/ d' in pay_lower or '/d' in pay_lower:
+        has_b2b = True
+        
+    if has_b2b and has_uop:
+        return 'B2B / UoP'
+    elif has_b2b:
+        return 'B2B'
+    elif has_uop:
+        return 'UoP'
+        
+    if source == 'Pracuj':
+        return 'UoP'
+    elif source in ['JJIT', 'NFJ', 'Solid', 'Bulldog', 'QABoard']:
+        if pay and any(k in pay_lower for k in ['/ h', '/ d', 'eur']):
+            return 'B2B'
+        return 'B2B / UoP'
+    elif source == 'LinkedIn':
+        return 'B2B / UoP'
+        
+    return 'B2B / UoP'
+
+def backfill_contract_types():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, url, source, pay, contract_type FROM jobs WHERE contract_type IS NULL OR contract_type = ''")
+    rows = cursor.fetchall()
+    updated = 0
+    for r in rows:
+        ctype = infer_contract_type(title=r['title'] or '', url=r['url'] or '', source=r['source'] or '', pay=r['pay'] or '')
+        if ctype:
+            cursor.execute("UPDATE jobs SET contract_type = ? WHERE id = ?", (ctype, r['id']))
+            updated += 1
+    conn.commit()
+    conn.close()
+    return updated
+
+def backfill_clean_pay():
+    import parsers
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, pay FROM jobs WHERE pay IS NOT NULL AND pay != ''")
+    rows = cursor.fetchall()
+    updated = 0
+    for r in rows:
+        old_pay = r['pay']
+        cleaned = parsers.clean_pay(old_pay)
+        if cleaned != old_pay:
+            cursor.execute("UPDATE jobs SET pay = ? WHERE id = ?", (cleaned, r['id']))
+            updated += 1
+    conn.commit()
+    conn.close()
+    return updated
 
 def infer_company_from_job(row):
     jid = row['id']
@@ -128,6 +199,9 @@ def infer_company_from_job(row):
         parts = slug.split('-')
         if parts:
             return parts[0].replace('-', ' ').title()
+
+    if 'qaboard.pl' in url or source == 'QABoard':
+        return "Quality Island"
 
     if source == 'Pracuj':
         return "Pracuj.pl Partner"

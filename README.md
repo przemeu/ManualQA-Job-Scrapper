@@ -1,4 +1,4 @@
-﻿# Manual QA Job Hunter & Application Tracker
+# Manual QA Job Hunter & Application Tracker
 
 An automated job scraping, filtering, and application management dashboard tailored for **Manual QA / QA Engineers** in Poland (Remote & Tricity / Trójmiasto).
 
@@ -20,30 +20,38 @@ Scrapes Polish and international tech job portals for QA opportunities:
 - **BulldogJob**
 - **LinkedIn**
 - **TheProtocol**
+- **QABoard.pl**
 
 ### 2. Intelligent Filtering & Quality Control
 - **Manual QA Focus**: Automatically weeds out developer/SDET automation-heavy listings while capturing genuine manual & exploratory QA roles.
 - **Location Filters**: Quick chips for **Remote** and **Tricity** (Gdańsk, Gdynia, Sopot).
 - **Duplicate Detection**: Filters out already seen and processed URLs across refresh cycles.
+- **Live Scraper Progress**: Real-time counter showing scanned, rejected, and added offers with a dismissible breakdown toast.
 
-### 3. Application Pipeline & Mini-CRM
-- **Stage Management**: Track progress for every job in APPLIED (Applied 🟣, Recruiter Screen 🔵, Tech Interview 🟡, Offer 🟢, Rejected 🔴).
+### 3. Salary & Contract Intelligence
+- **Contract Type Badges**: Detects and displays contract types (`B2B`, `UoP`, or `Both`).
+- **"Na rękę" (Net) Monthly Pay**: Automatically calculates and displays estimated take-home pay based on 2026 Polish tax/ZUS rules alongside gross ranges.
+
+### 4. Application Pipeline & Mini-CRM
+- **Stage Management**: Track progress for every job in `APPLIED` (`Applied` 🟣, `Recruiter Screen` 🔵, `Tech Interview` 🟡, `Offer` 🟢, `Rejected` 🔴).
 - **Application Notes & Salary Tracker**: Store recruiter notes, technical test tasks, asked salary, and upcoming interview dates.
-- **Tab Views**: Organized by ALL, NEW, APPLIED, IGNORED, and WRONG OFFERS.
+- **Tab Views**: Organized by `ALL`, `NEW`, `APPLIED`, `IGNORED`, and `WRONG OFFERS`.
+- **Manual Offer Addition**: Modal with Auto-Fetch details, URL duplicate check, and override popup.
 
-### 4. Market & Salary Insights Dashboard
+### 5. Market & Salary Insights Dashboard
 - Live salary statistics: median and range benchmarks.
 - Salary transparency percentage.
 - Remote work distribution and top in-demand QA skills.
 
-### 5. Automation & Notifications
+### 6. Automation & Notifications
 - **Background Auto-Scan**: Configurable interval scanner (e.g., every 30 or 60 minutes).
 - **Desktop Toast Notifications**: Native Windows 10/11 alerts.
 - **Telegram Bot Alerts**: Instant push notifications to your phone whenever new matching offers appear.
 
-### 6. CSV Export & Sorting
+### 7. CSV Export & Sorting
 - **1-Click Excel CSV Export**: UTF-8 BOM encoding with semicolon delimiters for Excel.
 - **Multi-Key Sorting**: Sort by Newest, Company (A-Z / Z-A), Highest Salary, or Title.
+- **Colored Portal Chips**: Top navigation chips styled to match portal colors.
 
 ---
 

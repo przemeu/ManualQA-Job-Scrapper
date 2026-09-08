@@ -5,21 +5,23 @@ from typing import List, Dict, Optional, Any
 
 # --- Regex Patterns ---
 AUTOMATION_TOOLS_REGEX = re.compile(r'(?i)\b(selenium|cypress|playwright|appium|restassured|puppeteer)\b')
-TRICITY_REGEX = re.compile(r'(?i)\b(tr[óo]jmiasto|gda[ńn]sk|gdynia|sopot|rumia|reda)\b')
-REMOTE_REGEX = re.compile(r'(?i)\b(remote|praca\s*zdalna|100%\s*remote|fully\s*remote)\b')
+POMERANIA_REGEX = re.compile(r'(?i)\b(pomorsk\w*|tr[óo]jmiasto|gda[ńn]sk|gdynia|sopot|rumia|reda|wejherow\w*|tczew\w*|s[łl]upsk\w*|starogard\w*|malbork\w*|kwidzyn\w*|l[ęe]bork\w*|pruszcz\s*gda[ńn]sk\w*)\b')
+TRICITY_REGEX = POMERANIA_REGEX
+REMOTE_REGEX = re.compile(r'(?i)\b(remote|praca\s*zdalna|100%\s*remote|fully\s*remote|zdalnie)\b')
 CONTRACT_REGEX = re.compile(r'(?i)\b(uop|umow[ae]\s*o\s*prac[eę]|b2b)\b')
 SUFFIX_STRIP_REGEX = re.compile(r'(?i)(\s*\(remote\)|\s*\(b2b\)|\s*sp\.\s*z\s*o\.\s*o\.?|\s*inc\.?|\s*llc\.?)')
 
 # Title filters to ensure it's ONLY a manual QA role
 TITLE_REQUIRED_REGEX = re.compile(r'(?i)\b(qa|test|tester|quality\s*assurance)\b')
 TITLE_REJECT_REGEX = re.compile(
-    r'(?i)\b(automation|automatyzuj[aą]cy|automatyzacji|automatyzacja|'
-    r'sdet|engineer\s+in\s+test|developer|programmer|architect\w*|'
+    r'(?i)\b(automation|automatyzuj\w*|automatyzacj\w*|automatyzacja|'
+    r'sdet|engineer\s+in\s+test|developer|programmer|programista|architect\w*|'
     r'python|staff|support|manager|lead|director|head|pm|project\s*manager|product\s*manager|release\s*manager|product\s*owner|scrum\s*master|'
     r'data\s*engineer|data\s*qa|ai|machine\s*learning|'
-    r'c#|java|kotlin|golang|rust|c\+\+|embedded|administrator|devops|'
-    r'security|penetration|pentest\w*|fullstack|full\s*stack|performance|'
-    r'intern|sta[żz]|sta[żz]ysta|specjalist[ay]?)\b'
+    r'c#|java|kotlin|golang|rust|c\+\+|embedded|administrator|devops|sysadmin|'
+    r'security|penetration|pentest\w*|fullstack|full\s*stack|performance|wydajno[śs]ciow\w*|'
+    r'intern|sta[żz]|sta[żz]ysta|praktyk\w*|trener|trainer|szkoleniow\w*|wyk[łl]adowc\w*|'
+    r'koordynator|coordinator)\b'
 )
 
 def is_title_valid(title: str) -> bool:
@@ -37,13 +39,13 @@ def is_location_valid(is_remote: bool, is_hybrid: bool, location_strings: List[s
         return True
     if is_hybrid:
         for loc in location_strings:
-            if TRICITY_REGEX.search(loc):
+            if POMERANIA_REGEX.search(loc):
                 return True
     return False
 
 # City names we care about, in priority order
-CITY_NAMES = ['Gdańsk', 'Gdynia', 'Sopot', 'Rumia', 'Reda']
-CITY_REGEX = re.compile(r'(?i)\b(gda[ńn]sk|gdynia|sopot|rumia|reda)\b')
+CITY_NAMES = ['Gdańsk', 'Gdynia', 'Sopot', 'Rumia', 'Reda', 'Wejherowo', 'Tczew', 'Słupsk', 'Malbork', 'Starogard Gdański', 'Kwidzyn', 'Lębork', 'Pruszcz Gdański']
+CITY_REGEX = re.compile(r'(?i)\b(gda[ńn]sk|gdynia|sopot|rumia|reda|wejherow\w*|tczew\w*|s[łl]upsk\w*|starogard\w*|malbork\w*|kwidzyn\w*|l[ęe]bork\w*|pruszcz\s*gda[ńn]sk\w*)\b')
 
 # Pay regex: matches patterns like "10 000 - 15 000 PLN", "8000-12000 zł", "5k-8k", etc.
 PAY_REGEX = re.compile(
@@ -75,10 +77,69 @@ def extract_city(text: str) -> str:
     return ""
 
 def clean_pay(val: str) -> str:
-    if not val:
+    if not val or val.strip() in ['Not given', 'brak widełek', 'brak widelek', 'None', '-']:
         return "Not given"
-    val = re.sub(r'[\s\xa0\u202f]+', ' ', val).strip()
-    return val if val else "Not given"
+        
+    s = val.replace('\xa0', ' ').replace('\u202f', ' ').strip()
+    lower = s.lower()
+    
+    # 1. Detect period / time unit
+    period = ''
+    if any(k in lower for k in ['godzinow', '/ hour', '/ h', '/h', 'godz', 'per hour']):
+        period = '/ h'
+    elif any(k in lower for k in ['dziennie', 'dzień', 'dzien', '/ day', '/ d', '/d', 'per day']):
+        period = '/ d'
+    elif any(k in lower for k in ['rocznie', 'rok', '/ year', '/ y', '/y', 'per year']):
+        period = '/ y'
+    elif any(k in lower for k in ['miesi', '/ month', '/ m', '/m', 'per month']):
+        period = '/ m'
+        
+    # 2. Detect currency
+    curr = 'PLN'
+    if 'EUR' in s or '€' in s:
+        curr = 'EUR'
+    elif 'USD' in s or '$' in s:
+        curr = 'USD'
+    elif 'GBP' in s or '£' in s:
+        curr = 'GBP'
+    elif 'zł' in lower or 'zl' in lower:
+        curr = 'PLN'
+        
+    # 3. Clean clutter
+    s = re.sub(r'(?i)\+\s*vat', '', s)
+    s = re.sub(r'(?i)\(b2b\)|\(uop\)|b2b|uop', '', s)
+    s = re.sub(r'(?i)brutto|netto', '', s)
+    s = re.sub(r'(?i)oblicz\s*[\"\']?na\s*r[eę]k[eę][\"\']?', '', s)
+    s = re.sub(r'(?i)oblicz\s*netto', '', s)
+    s = re.sub(r'(?i)miesięcznie|miesiecznie|godzinowo|dziennie|rocznie|month|hour|year|day', '', s)
+    s = re.sub(r'(?i)pln|eur|usd|gbp|zł|zl', '', s)
+    s = re.sub(r'[/\\()]', '', s)
+    s = s.replace('"', '').replace("'", '')
+    
+    # Normalize decimals e.g. 50,00 -> 50 or 50.00 -> 50
+    s = re.sub(r'(\d+)[,.]00\b', r'\1', s)
+    
+    # Normalize dashes
+    s = re.sub(r'\s*[-–—~to]+\s*', ' – ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Find numbers and range
+    nums_match = re.search(r'([\d\s]+(?:\s*–\s*[\d\s]+)?)', s)
+    if not nums_match:
+        return "Not given"
+        
+    num_part = nums_match.group(1).strip()
+    if '–' in num_part:
+        parts = [p.strip() for p in num_part.split('–')]
+        if len(parts) == 2 and parts[0] and parts[1]:
+            num_part = f"{parts[0]} – {parts[1]}"
+        elif len(parts) == 2 and parts[0]:
+            num_part = parts[0]
+            
+    res = f"{num_part} {curr}"
+    if period:
+        res += f" {period}"
+    return res
 
 def extract_pracuj_salary(soup: BeautifulSoup) -> str:
     """Extract salary from Pracuj offer header only, ignoring recommended offers."""

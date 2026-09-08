@@ -13,14 +13,73 @@ METRICS = {
     "other_rejected": 0
 }
 
+SCRAPER_STATE = {
+    "is_running": False,
+    "portal": "ALL",
+    "deep": False,
+    "scanned": 0,
+    "passed": 0,
+    "automation_rejected": 0,
+    "other_rejected": 0,
+    "duplicates": 0,
+    "current_portal": "",
+    "current_job": "",
+    "current_status": "Idle"
+}
+
 def reset_metrics():
-    global METRICS
+    global METRICS, SCRAPER_STATE
     METRICS = {
         "scanned": 0,
         "duplicates": 0,
         "automation_rejected": 0,
         "other_rejected": 0
     }
+    SCRAPER_STATE = {
+        "is_running": False,
+        "portal": "ALL",
+        "deep": False,
+        "scanned": 0,
+        "passed": 0,
+        "automation_rejected": 0,
+        "other_rejected": 0,
+        "duplicates": 0,
+        "current_portal": "",
+        "current_job": "",
+        "current_status": "Idle"
+    }
+
+def update_progress(portal: str = "", title: str = "", status: str = ""):
+    global SCRAPER_STATE
+    if portal:
+        SCRAPER_STATE["current_portal"] = portal
+    if title:
+        SCRAPER_STATE["current_job"] = title
+    if status:
+        SCRAPER_STATE["current_status"] = status
+
+def record_scanned(portal: str, title: str = ""):
+    global SCRAPER_STATE, METRICS
+    METRICS["scanned"] += 1
+    SCRAPER_STATE["scanned"] += 1
+    update_progress(portal, title, f"Checking: {title}" if title else f"Scanning {portal}...")
+
+def record_rejected_automation(portal: str, title: str = ""):
+    global SCRAPER_STATE, METRICS
+    METRICS["automation_rejected"] += 1
+    SCRAPER_STATE["automation_rejected"] += 1
+    update_progress(portal, title, f"Rejected (Automation): {title}" if title else "Rejected automation")
+
+def record_rejected_other(portal: str, title: str = "", reason: str = "Filter"):
+    global SCRAPER_STATE, METRICS
+    METRICS["other_rejected"] += 1
+    SCRAPER_STATE["other_rejected"] += 1
+    update_progress(portal, title, f"Rejected ({reason}): {title}" if title else f"Rejected {reason}")
+
+def record_accepted(portal: str, title: str = ""):
+    global SCRAPER_STATE
+    SCRAPER_STATE["passed"] += 1
+    update_progress(portal, title, f"Accepted: {title}" if title else "Accepted")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,6 +147,7 @@ def get_job_urls(page, list_url, link_selector, prefix="", max_urls=15):
 
 def scrape_jjit(browser, deep=False):
     logger.info("Scraping Just Join IT...")
+    update_progress("JJIT", "", "Scanning Just Join IT listings...")
     jobs = []
     page = browser.new_page()
     max_urls = 50 if deep else 15
@@ -109,9 +169,14 @@ def scrape_jjit(browser, deep=False):
             
             title_node = soup.find('h1')
             title = title_node.get_text(strip=True) if title_node else ""
+            record_scanned("JJIT", title or url)
             
             if not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (JJIT) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("JJIT", title)
+                else:
+                    record_rejected_other("JJIT", title, "Title")
                 continue
             
             # Extract location from structured ld+json and offer header
@@ -127,7 +192,7 @@ def scrape_jjit(browser, deep=False):
                         if loc and isinstance(loc, dict):
                             addr = loc.get('address', {})
                             c_name = addr.get('addressLocality', '')
-                            if parsers.TRICITY_REGEX.search(c_name):
+                            if parsers.POMERANIA_REGEX.search(c_name):
                                 city = c_name
                     except: pass
             
@@ -149,11 +214,13 @@ def scrape_jjit(browser, deep=False):
             
             if not is_remote and not city:
                 logger.info(f"  REJECTED (JJIT) location: {title}")
+                record_rejected_other("JJIT", title, "Location")
                 continue
                 
             # Check contract
             if not parsers.CONTRACT_REGEX.search(main_text):
                 logger.info(f"  REJECTED (JJIT) contract: {title}")
+                record_rejected_other("JJIT", title, "Contract")
                 continue
             
             # Check automation tools in requirements & technology chips
@@ -185,6 +252,7 @@ def scrape_jjit(browser, deep=False):
                                 
             if has_auto_tools:
                 logger.info(f"  REJECTED (JJIT) automation tools: {title}")
+                record_rejected_automation("JJIT", title)
                 continue
             
             city_display = "Remote" if is_remote and not city else (f"{city} / Remote" if is_remote and city else city)
@@ -200,6 +268,7 @@ def scrape_jjit(browser, deep=False):
                 'pay': parsers.extract_jjit_salary(soup),
                 'published_at': parsers.extract_published_date(soup, main_text)
             })
+            record_accepted("JJIT", title)
             logger.info(f"  ACCEPTED (JJIT): {title} @ {company}")
             
         except Exception as e:
@@ -211,6 +280,7 @@ def scrape_jjit(browser, deep=False):
 
 def scrape_nfj(browser, deep=False):
     logger.info("Scraping No Fluff Jobs...")
+    update_progress("NFJ", "", "Scanning No Fluff Jobs listings...")
     jobs = []
     page = browser.new_page()
     max_urls = 50 if deep else 15
@@ -232,9 +302,14 @@ def scrape_nfj(browser, deep=False):
             
             title_node = soup.find('h1')
             title = title_node.get_text(strip=True) if title_node else ""
+            record_scanned("NFJ", title or url)
             
             if not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (NFJ) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("NFJ", title)
+                else:
+                    record_rejected_other("NFJ", title, "Title")
                 continue
             
             # Extract location from structured ld+json and header badges
@@ -255,7 +330,7 @@ def scrape_nfj(browser, deep=False):
                             if loc and isinstance(loc, dict):
                                 addr = loc.get('address', {})
                                 c_name = addr.get('addressLocality', '')
-                                if parsers.TRICITY_REGEX.search(c_name):
+                                if parsers.POMERANIA_REGEX.search(c_name):
                                     city = c_name
                             org = item.get('hiringOrganization')
                             if org and isinstance(org, dict):
@@ -287,11 +362,13 @@ def scrape_nfj(browser, deep=False):
             
             if not is_remote and not city:
                 logger.info(f"  REJECTED (NFJ) location: {title}")
+                record_rejected_other("NFJ", title, "Location")
                 continue
                 
             # Check contract
             if not parsers.CONTRACT_REGEX.search(main_text):
                 logger.info(f"  REJECTED (NFJ) contract: {title}")
+                record_rejected_other("NFJ", title, "Contract")
                 continue
                 
             # Check automation tools in requirements (Polish & English headers)
@@ -314,6 +391,7 @@ def scrape_nfj(browser, deep=False):
                         
             if has_auto_tools:
                 logger.info(f"  REJECTED (NFJ) automation tools: {title}")
+                record_rejected_automation("NFJ", title)
                 continue
                 
             city_display = "Remote" if is_remote and not city else (f"{city} / Remote" if is_remote and city else city)
@@ -327,6 +405,7 @@ def scrape_nfj(browser, deep=False):
                 'pay': parsers.extract_nfj_salary(soup),
                 'published_at': parsers.extract_published_date(soup, main_text)
             })
+            record_accepted("NFJ", title)
             logger.info(f"  ACCEPTED (NFJ): {title} @ {company}")
             
         except Exception as e:
@@ -338,6 +417,7 @@ def scrape_nfj(browser, deep=False):
 
 def scrape_pracuj(browser, deep=False):
     logger.info("Scraping Pracuj.pl...")
+    update_progress("Pracuj", "", "Scanning Pracuj.pl listings...")
     jobs = []
     page = browser.new_page()
     max_urls = 50 if deep else 15
@@ -353,10 +433,6 @@ def scrape_pracuj(browser, deep=False):
     logger.info(f"Pracuj total unique URLs to visit: {len(unique_urls)}")
     page.close()
     
-    # CRITICAL: Pracuj's anti-bot measures prevent the SPA from rendering when
-    # the same page context navigates to multiple job pages. We MUST use a fresh
-    # browser.new_page() for each job visit. Each page gets its own cookie state,
-    # so we dismiss the cookie consent popup once per page.
     for url in unique_urls:
         job_page = browser.new_page()
         try:
@@ -378,6 +454,7 @@ def scrape_pracuj(browser, deep=False):
             # Use Pracuj's data-test attributes for reliable extraction
             title_node = soup.find(attrs={'data-test': 'text-positionName'})
             title = title_node.get_text(strip=True) if title_node else ''
+            record_scanned("Pracuj", title or url)
             
             if not title or title == 'www.pracuj.pl':
                 logger.info(f"  SKIPPED (Pracuj): No valid title for {url[:60]}...")
@@ -394,6 +471,10 @@ def scrape_pracuj(browser, deep=False):
             # Title filter
             if not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (Pracuj) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("Pracuj", title)
+                else:
+                    record_rejected_other("Pracuj", title, "Title")
                 job_page.close()
                 continue
             
@@ -406,17 +487,19 @@ def scrape_pracuj(browser, deep=False):
             combined_loc_text = f"{loc_text} {h_text}".strip()
             
             is_remote = bool(parsers.REMOTE_REGEX.search(combined_loc_text)) or 'praca zdalna' in combined_loc_text.lower()
-            has_tricity = bool(parsers.TRICITY_REGEX.search(combined_loc_text))
+            has_tricity = bool(parsers.POMERANIA_REGEX.search(combined_loc_text))
             
             # Location filter
             if not is_remote and not has_tricity:
                 logger.info(f"  REJECTED (Pracuj) location: {title}")
+                record_rejected_other("Pracuj", title, "Location")
                 job_page.close()
                 continue
             
             # Contract filter
             if not parsers.CONTRACT_REGEX.search(text_content):
                 logger.info(f"  REJECTED (Pracuj) contract: {title}")
+                record_rejected_other("Pracuj", title, "Contract")
                 job_page.close()
                 continue
             
@@ -440,6 +523,7 @@ def scrape_pracuj(browser, deep=False):
                                 
             if rejected_automation:
                 logger.info(f"  REJECTED (Pracuj) automation tools: {title}")
+                record_rejected_automation("Pracuj", title)
                 job_page.close()
                 continue
             
@@ -457,6 +541,7 @@ def scrape_pracuj(browser, deep=False):
                 'pay': parsers.extract_pracuj_salary(soup),
                 'published_at': parsers.extract_published_date(soup, text_content)
             })
+            record_accepted("Pracuj", title)
             logger.info(f"  ACCEPTED (Pracuj): {title} @ {company}")
             
         except Exception as e:
@@ -469,6 +554,7 @@ def scrape_pracuj(browser, deep=False):
 
 def scrape_protocol(browser, deep=False):
     logger.info("Scraping theprotocol.it...")
+    update_progress("Protocol", "", "Scanning theprotocol.it listings...")
     jobs = []
     page = browser.new_page()
     max_urls = 50 if deep else 15
@@ -518,6 +604,7 @@ def scrape_protocol(browser, deep=False):
             
             title_node = soup.find('h1')
             title = title_node.get_text(strip=True) if title_node else ''
+            record_scanned("Protocol", title or url)
             
             if not title or 'theprotocol' in title.lower():
                 logger.info(f"  SKIPPED (Protocol): No valid title for {url[:60]}...")
@@ -564,6 +651,10 @@ def scrape_protocol(browser, deep=False):
             # Title filter
             if not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (Protocol) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("Protocol", title)
+                else:
+                    record_rejected_other("Protocol", title, "Title")
                 continue
             
             # Location filter - use targeted Protocol workModes & location tags
@@ -574,7 +665,7 @@ def scrape_protocol(browser, deep=False):
             loc_combined = f"{modes_text} {place_text}"
             
             is_remote = bool(parsers.REMOTE_REGEX.search(loc_combined)) or 'zdaln' in loc_combined.lower()
-            has_tricity = bool(parsers.TRICITY_REGEX.search(loc_combined))
+            has_tricity = bool(parsers.POMERANIA_REGEX.search(loc_combined))
             
             # If not in specific tags, check offer header near title
             if not is_remote and not has_tricity and title_node:
@@ -583,23 +674,26 @@ def scrape_protocol(browser, deep=False):
                     hp_text = h_parent.get_text(separator=' ')
                     if parsers.REMOTE_REGEX.search(hp_text) or 'zdaln' in hp_text.lower():
                         is_remote = True
-                    if parsers.TRICITY_REGEX.search(hp_text):
+                    if parsers.POMERANIA_REGEX.search(hp_text):
                         has_tricity = True
                         loc_combined += f" {hp_text}"
             
             if not is_remote and not has_tricity:
                 logger.info(f"  REJECTED (Protocol) location: {title}")
+                record_rejected_other("Protocol", title, "Location")
                 continue
             
             # Contract filter
             if not parsers.CONTRACT_REGEX.search(text_content):
                 logger.info(f"  REJECTED (Protocol) contract: {title}")
+                record_rejected_other("Protocol", title, "Contract")
                 continue
             
             # Automation tools in must-have requirements or expected technologies
             tech_expected = soup.find(attrs={'data-test': 'section-technologies-expected'}) or soup.find(attrs={'data-test': 'section-technologies-required'})
             if tech_expected and parsers.AUTOMATION_TOOLS_REGEX.search(tech_expected.get_text(separator=' ')):
                 logger.info(f"  REJECTED (Protocol) automation tools: {title}")
+                record_rejected_automation("Protocol", title)
                 continue
                 
             oczekujemy = soup.find(string=lambda s: s and s.strip().lower() in ['oczekujemy', 'wymagania', 'must have', 'requirements'])
@@ -636,6 +730,7 @@ def scrape_protocol(browser, deep=False):
 
 def scrape_bulldogjob(browser, deep=False):
     logger.info("Scraping Bulldogjob...")
+    update_progress("Bulldog", "", "Scanning Bulldogjob listings...")
     jobs = []
     page = browser.new_page()
     max_pages = 3 if deep else 1
@@ -678,7 +773,6 @@ def scrape_bulldogjob(browser, deep=False):
             
             # Check ld+json
             ld_scripts = soup.find_all('script', type='application/ld+json')
-            logger.info(f"Bulldog {url[:50]}: found {len(ld_scripts)} ld+json scripts")
             ld_data = {}
             for s in ld_scripts:
                 raw_text = s.get_text().strip()
@@ -694,9 +788,14 @@ def scrape_bulldogjob(browser, deep=False):
             if not title:
                 h1 = soup.find('h1')
                 title = h1.get_text(strip=True) if h1 else ''
+            record_scanned("Bulldog", title or url)
                 
             if not title or not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (Bulldog) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("Bulldog", title)
+                else:
+                    record_rejected_other("Bulldog", title, "Title")
                 continue
                 
             company = "Unknown"
@@ -715,7 +814,7 @@ def scrape_bulldogjob(browser, deep=False):
                     if isinstance(item, dict):
                         addr = item.get('address') or {}
                         c_name = (addr.get('addressLocality') or '') if isinstance(addr, dict) else ''
-                        if c_name and parsers.TRICITY_REGEX.search(c_name):
+                        if c_name and parsers.POMERANIA_REGEX.search(c_name):
                             city = c_name
                             break
                             
@@ -725,12 +824,13 @@ def scrape_bulldogjob(browser, deep=False):
             
             if not is_remote and (parsers.REMOTE_REGEX.search(h_text) or 'remote' in url.lower()):
                 is_remote = True
-            if not city and parsers.TRICITY_REGEX.search(h_text):
-                m = parsers.TRICITY_REGEX.search(h_text)
+            if not city and parsers.POMERANIA_REGEX.search(h_text):
+                m = parsers.POMERANIA_REGEX.search(h_text)
                 city = m.group(0).title()
                 
             if not is_remote and not city:
                 logger.info(f"  REJECTED (Bulldog) location: {title} @ {company}")
+                record_rejected_other("Bulldog", title, "Location")
                 continue
                 
             # Contract check
@@ -739,6 +839,7 @@ def scrape_bulldogjob(browser, deep=False):
             has_contract = bool(parsers.CONTRACT_REGEX.search(emp_type) or parsers.CONTRACT_REGEX.search(text_content))
             if not has_contract:
                 logger.info(f"  REJECTED (Bulldog) contract: {title} @ {company}")
+                record_rejected_other("Bulldog", title, "Contract")
                 continue
                 
             # Automation tools check
@@ -769,6 +870,7 @@ def scrape_bulldogjob(browser, deep=False):
                             
             if has_auto:
                 logger.info(f"  REJECTED (Bulldog) automation tools: {title} @ {company}")
+                record_rejected_automation("Bulldog", title)
                 continue
                 
             # Salary extraction
@@ -800,6 +902,7 @@ def scrape_bulldogjob(browser, deep=False):
                 'pay': pay,
                 'published_at': pub_date
             })
+            record_accepted("Bulldog", title)
             logger.info(f"  ACCEPTED (Bulldog): {title} @ {company} | {city_display} | {pay}")
             
         except Exception as e:
@@ -812,6 +915,7 @@ def scrape_bulldogjob(browser, deep=False):
 
 def scrape_solidjobs(browser, deep=False):
     logger.info("Scraping Solid.jobs...")
+    update_progress("Solid", "", "Scanning Solid.jobs listings...")
     page = browser.new_page()
     jobs = []
     
@@ -870,8 +974,14 @@ def scrape_solidjobs(browser, deep=False):
                     except: pass
                     
             title = ld_data.get('title') or (soup.find('h1').get_text(strip=True) if soup.find('h1') else '')
+            record_scanned("Solid", title or url)
+            
             if not title or not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (Solid) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("Solid", title)
+                else:
+                    record_rejected_other("Solid", title, "Title")
                 continue
                 
             company = "Unknown"
@@ -889,19 +999,20 @@ def scrape_solidjobs(browser, deep=False):
                     if isinstance(item, dict):
                         addr = item.get('address') or {}
                         c_name = (addr.get('addressLocality') or '') if isinstance(addr, dict) else ''
-                        if c_name and parsers.TRICITY_REGEX.search(c_name):
+                        if c_name and parsers.POMERANIA_REGEX.search(c_name):
                             city = c_name
                             break
                             
             text_content = soup.get_text(separator=' ', strip=True)
             if not is_remote and (parsers.REMOTE_REGEX.search(text_content[:1500]) or 'zdalnie' in text_content[:1500].lower()):
                 is_remote = True
-            if not city and parsers.TRICITY_REGEX.search(text_content[:1500]):
-                m = parsers.TRICITY_REGEX.search(text_content[:1500])
+            if not city and parsers.POMERANIA_REGEX.search(text_content[:1500]):
+                m = parsers.POMERANIA_REGEX.search(text_content[:1500])
                 city = m.group(0).title()
                 
             if not is_remote and not city:
                 logger.info(f"  REJECTED (Solid) location: {title} @ {company}")
+                record_rejected_other("Solid", title, "Location")
                 continue
                 
             # Contract check
@@ -909,6 +1020,7 @@ def scrape_solidjobs(browser, deep=False):
             has_contract = bool(parsers.CONTRACT_REGEX.search(emp_type) or parsers.CONTRACT_REGEX.search(text_content))
             if not has_contract:
                 logger.info(f"  REJECTED (Solid) contract: {title} @ {company}")
+                record_rejected_other("Solid", title, "Contract")
                 continue
                 
             # Automation tools check in requirements (ignoring nice-to-have / mile widziane)
@@ -939,6 +1051,7 @@ def scrape_solidjobs(browser, deep=False):
                             
             if has_auto:
                 logger.info(f"  REJECTED (Solid) automation tools: {title} @ {company}")
+                record_rejected_automation("Solid", title)
                 continue
                 
             # Salary extraction
@@ -969,6 +1082,7 @@ def scrape_solidjobs(browser, deep=False):
                 'pay': pay,
                 'published_at': pub_date
             })
+            record_accepted("Solid", title)
             logger.info(f"  ACCEPTED (Solid): {title} @ {company} | {city_display} | {pay}")
             
         except Exception as e:
@@ -981,6 +1095,7 @@ def scrape_solidjobs(browser, deep=False):
 
 def scrape_4programmers(browser, deep=False):
     logger.info("Scraping 4programmers...")
+    update_progress("4prog", "", "Scanning 4programmers listings...")
     page = browser.new_page()
     jobs = []
     
@@ -1026,9 +1141,14 @@ def scrape_4programmers(browser, deep=False):
             soup = BeautifulSoup(job_page.content(), 'html.parser')
             h1 = soup.find('h1')
             title = h1.get_text(strip=True) if h1 else ''
+            record_scanned("4prog", title or url)
             
             if not title or not parsers.is_title_valid(title):
                 logger.info(f"  REJECTED (4programmers) title: {title}")
+                if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                    record_rejected_automation("4prog", title)
+                else:
+                    record_rejected_other("4prog", title, "Title")
                 continue
                 
             comp_a = soup.find('a', href=lambda h: h and '/Praca/Firma/' in h)
@@ -1039,18 +1159,20 @@ def scrape_4programmers(browser, deep=False):
             # Location check
             is_remote = bool(parsers.REMOTE_REGEX.search(text_content) or 'zdalna' in text_content.lower())
             city = ""
-            if parsers.TRICITY_REGEX.search(text_content):
-                m = parsers.TRICITY_REGEX.search(text_content)
+            if parsers.POMERANIA_REGEX.search(text_content):
+                m = parsers.POMERANIA_REGEX.search(text_content)
                 city = m.group(0).title()
                 
             if not is_remote and not city:
                 logger.info(f"  REJECTED (4programmers) location: {title} @ {company}")
+                record_rejected_other("4prog", title, "Location")
                 continue
                 
             # Contract check
             has_contract = bool(parsers.CONTRACT_REGEX.search(text_content))
             if not has_contract:
                 logger.info(f"  REJECTED (4programmers) contract: {title} @ {company}")
+                record_rejected_other("4prog", title, "Contract")
                 continue
                 
             # Automation tools in requirements
@@ -1071,6 +1193,7 @@ def scrape_4programmers(browser, deep=False):
                         
             if has_auto:
                 logger.info(f"  REJECTED (4programmers) automation tools: {title} @ {company}")
+                record_rejected_automation("4prog", title)
                 continue
                 
             # Pay
@@ -1090,6 +1213,7 @@ def scrape_4programmers(browser, deep=False):
                 'pay': pay,
                 'published_at': ''
             })
+            record_accepted("4prog", title)
             logger.info(f"  ACCEPTED (4programmers): {title} @ {company} | {city_display} | {pay}")
         except Exception as e:
             logger.error(f"Error scraping 4programmers {url}: {e}")
@@ -1101,6 +1225,7 @@ def scrape_4programmers(browser, deep=False):
 
 def scrape_linkedin(browser, deep=False):
     logger.info("Scraping LinkedIn (guest mode)...")
+    update_progress("LinkedIn", "", "Scanning LinkedIn QA listings...")
     page = browser.new_page()
     jobs = []
     
@@ -1162,13 +1287,19 @@ def scrape_linkedin(browser, deep=False):
     candidates = []
     for url, item in card_data.items():
         title = item['title']
+        record_scanned("LinkedIn", title or url)
         if not title or not parsers.is_title_valid(title):
+            if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                record_rejected_automation("LinkedIn", title)
+            else:
+                record_rejected_other("LinkedIn", title, "Title")
             continue
             
         loc = item['location']
         is_remote = item['is_remote']
-        is_tricity = bool(parsers.TRICITY_REGEX.search(loc))
+        is_tricity = bool(parsers.POMERANIA_REGEX.search(loc))
         if not is_remote and not is_tricity:
+            record_rejected_other("LinkedIn", title, "Location")
             continue
             
         candidates.append((url, item))
@@ -1217,6 +1348,7 @@ def scrape_linkedin(browser, deep=False):
                         
             if has_auto:
                 logger.info(f"  REJECTED (LinkedIn) automation tools: {item['title']} @ {item['company']}")
+                record_rejected_automation("LinkedIn", item['title'])
                 continue
                 
             # Salary if in LD+JSON or text
@@ -1240,7 +1372,7 @@ def scrape_linkedin(browser, deep=False):
             
             is_remote = item['is_remote']
             loc = item['location']
-            is_tricity = bool(parsers.TRICITY_REGEX.search(loc))
+            is_tricity = bool(parsers.POMERANIA_REGEX.search(loc))
             city_display = "Remote" if is_remote and not is_tricity else (f"{loc} / Remote" if is_remote and is_tricity else loc)
             
             jobs.append({
@@ -1252,6 +1384,7 @@ def scrape_linkedin(browser, deep=False):
                 'pay': pay,
                 'published_at': pub_date
             })
+            record_accepted("LinkedIn", item['title'])
             logger.info(f"  ACCEPTED (LinkedIn): {item['title']} @ {item['company']} | {city_display} | {pay}")
             
         except Exception as e:
@@ -1324,31 +1457,31 @@ def scrape_rocketjobs(browser, deep=False):
     logger.info(f"RocketJobs unique cards collected: {len(raw_offers)}")
     
     for c in raw_offers:
-        METRICS["scanned"] += 1
         title = c['title']
         card_text = c['cardText']
+        record_scanned("Rocket", title)
         lines = [l.strip() for l in card_text.split('\n') if l.strip()]
         company = lines[0] if lines else "Unknown"
         
         # 1. Title validation
         if not parsers.is_title_valid(title):
-            if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzuj|sdet)\b', title):
-                METRICS["automation_rejected"] += 1
+            if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                record_rejected_automation("Rocket", title)
             else:
-                METRICS["other_rejected"] += 1
+                record_rejected_other("Rocket", title, "Title")
             continue
             
         # 2. Automation tools in card text
-        if parsers.AUTOMATION_TOOLS_REGEX.search(card_text) or re.search(r'(?i)\b(automation|automatyzuj)\b', card_text):
-            METRICS["automation_rejected"] += 1
+        if parsers.AUTOMATION_TOOLS_REGEX.search(card_text) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', card_text):
+            record_rejected_automation("Rocket", title)
             logger.info(f"  REJECTED (RocketJobs) automation: {title} @ {company}")
             continue
             
         # 3. Location filter
         is_remote = bool(re.search(r'(?i)zdalnie|remote', card_text))
-        is_tricity = bool(parsers.TRICITY_REGEX.search(card_text))
+        is_tricity = bool(parsers.POMERANIA_REGEX.search(card_text))
         if not is_remote and not is_tricity:
-            METRICS["other_rejected"] += 1
+            record_rejected_other("Rocket", title, "Location")
             continue
             
         # 4. Salary
@@ -1359,7 +1492,7 @@ def scrape_rocketjobs(browser, deep=False):
         elif parsers.PAY_REGEX.search(card_text):
             pay = parsers.PAY_REGEX.search(card_text).group(0).strip().replace('\xa0', ' ')
             
-        city = "Remote" if is_remote and not is_tricity else ("Gdańsk / Remote" if is_remote and is_tricity else "Tricity")
+        city = "Remote" if is_remote and not is_tricity else ("Gdańsk / Remote" if is_remote and is_tricity else "Gdańsk")
         
         pub_date = ""
         m_date = re.search(r'(Wygasa\s+[^\n]+)', card_text)
@@ -1376,13 +1509,148 @@ def scrape_rocketjobs(browser, deep=False):
             'source': 'RocketJobs'
         }
         jobs.append(job_item)
+        record_accepted("Rocket", title)
         logger.info(f"  ACCEPTED (RocketJobs): {title} @ {company} | {city} | {pay}")
         
     return jobs
 
 
+def scrape_qaboard(browser, deep=False):
+    logger.info("Scraping QA Board (https://qaboard.pl/jobs)...")
+    update_progress("QABoard", "", "Scanning QA Board listings...")
+    jobs = []
+    page = browser.new_page()
+    seen_urls = set()
+    
+    max_pages = 5 if deep else 2
+    for page_num in range(1, max_pages + 1):
+        list_url = f"https://qaboard.pl/jobs?page={page_num}" if page_num > 1 else "https://qaboard.pl/jobs"
+        try:
+            page.goto(list_url, wait_until="domcontentloaded", timeout=25000)
+            page.wait_for_timeout(2000)
+            dismiss_cookie_consent(page)
+            
+            html = page.content()
+            soup = BeautifulSoup(html, 'html.parser')
+            articles = soup.find_all('article')
+            if not articles:
+                break
+                
+            for art in articles:
+                card_text = art.get_text(separator=' | ', strip=True).replace('\u2013', '-').replace('\u2014', '-').replace('–', '-')
+                
+                job_url = ""
+                for a in art.find_all('a', href=True):
+                    href = a['href']
+                    if '/jobs/' in href or 'solid.jobs' in href:
+                        job_url = "https://qaboard.pl" + href if href.startswith('/') else href
+                        break
+                if not job_url:
+                    a_tags = art.find_all('a', href=True)
+                    if a_tags:
+                        href = a_tags[-1]['href']
+                        job_url = "https://qaboard.pl" + href if href.startswith('/') else href
+                        
+                if not job_url or job_url in seen_urls:
+                    continue
+                seen_urls.add(job_url)
+                
+                h_tag = art.find(['h1', 'h2', 'h3', 'h4'])
+                raw_title = h_tag.get_text(strip=True) if h_tag else ""
+                title = re.sub(r'(?i)(Senior|Mid|Junior|Lead)$', '', raw_title).strip()
+                if not title:
+                    title = raw_title
+                    
+                record_scanned("QABoard", title or job_url)
+                    
+                # 1. Title filter (Strict Manual QA only)
+                if not parsers.is_title_valid(title):
+                    logger.info(f"  REJECTED (QABoard) title: {title}")
+                    if parsers.AUTOMATION_TOOLS_REGEX.search(title) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', title):
+                        record_rejected_automation("QABoard", title)
+                    else:
+                        record_rejected_other("QABoard", title, "Title")
+                    continue
+                    
+                # 2. Automation tools in card text
+                if parsers.AUTOMATION_TOOLS_REGEX.search(card_text) or re.search(r'(?i)\b(automation|automatyzacj\w*|automatyzuj\w*|sdet)\b', card_text):
+                    logger.info(f"  REJECTED (QABoard) automation: {title}")
+                    record_rejected_automation("QABoard", title)
+                    continue
+                    
+                # 3. Location filter: Remote OR Pomerania
+                is_remote = bool(re.search(r'(?i)\bzdalnie\b|\bremote\b', card_text))
+                is_pomerania = bool(parsers.POMERANIA_REGEX.search(card_text))
+                is_other_city = bool(re.search(r'(?i)\b(warszaw\w*|warsaw|krak[óo]w|krakow|wroc[łl]aw|wroclaw|pozna[ńn]|poznan|katowic\w*|silesia|[łl][óo]d[źz]|lodz|szczecin|lublin|bia[łl]ystok|rzesz[óo]w|bydgoszcz|toru[ńn])\b', card_text))
+                is_hybrid = bool(re.search(r'(?i)\bhybryd\w*|hybrid\b', card_text))
+                
+                # Reject if hybrid/onsite in non-Pomerania city
+                if is_other_city and (is_hybrid or not is_remote) and not is_pomerania:
+                    logger.info(f"  REJECTED (QABoard) non-Pomerania location: {title} @ {card_text[:80]}")
+                    record_rejected_other("QABoard", title, "Location")
+                    continue
+                    
+                if not is_remote and not is_pomerania:
+                    logger.info(f"  REJECTED (QABoard) location: {title}")
+                    record_rejected_other("QABoard", title, "Location")
+                    continue
+                    
+                # City display
+                if is_pomerania and is_remote:
+                    city_display = "Gdańsk / Remote"
+                elif is_pomerania:
+                    city_display = "Gdańsk (Hybrid)" if is_hybrid else "Gdańsk"
+                else:
+                    city_display = "Remote"
+                    
+                company = "Quality Island"
+                if "ITFS" in card_text:
+                    company = "ITFS"
+                elif "Solid.Jobs" in card_text:
+                    company = "Quality Island Partner"
+                    
+                pay = "Not given"
+                m_sal = re.search(r'Wynagrodzenie\s*\|\s*([\d\s,.-]+)\s*\|\s*(PLN/[hm]|zł/[hm]|PLN|EUR|USD)', card_text, re.I)
+                if m_sal:
+                    pay = parsers.clean_pay(f"{m_sal.group(1).strip()} {m_sal.group(2).strip()}")
+                elif parsers.PAY_REGEX.search(card_text):
+                    pay = parsers.clean_pay(parsers.PAY_REGEX.search(card_text).group(0))
+                    
+                pub_date = ""
+                m_pub = re.search(r'Opublikowano\s+([^\n|]+)', card_text)
+                if m_pub:
+                    pub_date = m_pub.group(1).strip()
+                    
+                job_item = {
+                    'title': title,
+                    'company': company,
+                    'url': job_url,
+                    'city': city_display,
+                    'pay': pay,
+                    'published_at': pub_date,
+                    'source': 'QABoard'
+                }
+                jobs.append(job_item)
+                record_accepted("QABoard", title)
+                logger.info(f"  ACCEPTED (QABoard): {title} @ {company} | {city_display} | {pay}")
+        except Exception as e:
+            logger.error(f"Error scraping QABoard page {page_num}: {e}")
+            break
+            
+    page.close()
+    return jobs
+
+
 def run_scraper(portal="ALL", deep=False):
+    global SCRAPER_STATE
     reset_metrics()
+    SCRAPER_STATE["is_running"] = True
+    SCRAPER_STATE["portal"] = portal
+    SCRAPER_STATE["deep"] = deep
+    SCRAPER_STATE["current_portal"] = portal
+    SCRAPER_STATE["current_job"] = "Initializing browser..."
+    SCRAPER_STATE["current_status"] = "Launching scraper..."
+    
     all_raw_jobs = []
     
     # headless=False bypasses WAF / Cloudflare blocks
@@ -1407,6 +1675,8 @@ def run_scraper(portal="ALL", deep=False):
             all_raw_jobs.extend(scrape_linkedin(browser, deep))
         if portal in ["ALL", "ROCKET", "ROCKETJOBS"]:
             all_raw_jobs.extend(scrape_rocketjobs(browser, deep))
+        if portal in ["ALL", "QABOARD", "QA_BOARD"]:
+            all_raw_jobs.extend(scrape_qaboard(browser, deep))
             
         browser.close()
         
@@ -1414,6 +1684,9 @@ def run_scraper(portal="ALL", deep=False):
     deduplicated = parsers.deduplicate_jobs(all_raw_jobs)
     dedup_diff = initial_count - len(deduplicated)
     METRICS["duplicates"] += dedup_diff
+    SCRAPER_STATE["duplicates"] += dedup_diff
+    SCRAPER_STATE["is_running"] = False
+    SCRAPER_STATE["current_status"] = "Scan complete"
     
     # Build lookup maps for extra fields
     extra_map = {job['url']: job for job in all_raw_jobs}

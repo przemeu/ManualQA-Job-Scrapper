@@ -3,86 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Fetcher</title>
+    <title>Job Fetcher — QA Opportunities Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .tab-active { border-bottom: 2px solid #000; color: #000; font-weight: 600; }
-        .job-card-enter { animation: slideIn 0.3s ease-out forwards; }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
+        body { 
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            letter-spacing: -0.01em;
+        }
+        .tab-active { 
+            border-bottom: 2.5px solid #4f46e5; 
+            color: #4f46e5; 
+            font-weight: 700; 
+        }
+        .job-card-enter { 
+            animation: slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+        }
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        .kanban-col-body {
+            max-height: calc(100vh - 215px);
+            min-height: 280px;
+        }
+        .drag-over-active {
+            background-color: #e0e7ff !important;
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+        }
+        .dragging {
+            opacity: 0.45;
+            transform: scale(0.98);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .portal-btn {
+            transition: all 0.15s ease;
+        }
+        .portal-btn:hover {
+            transform: translateY(-1px);
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 h-screen flex flex-col">
+<body class="bg-slate-50/70 text-slate-800 h-screen flex flex-col overflow-hidden antialiased selection:bg-indigo-500 selection:text-white">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div class="max-w-4xl mx-auto px-4 py-5 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-            <h1 class="text-2xl font-bold tracking-tight text-gray-900">Job Fetcher</h1>
-            <div class="flex flex-wrap gap-2 items-center" id="actionButtons">
-                <button onclick="refreshJobs('ALL')" id="refreshBtn-ALL" class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 active:scale-95">
-                    <i class="fas fa-sync-alt"></i> Refresh ALL
+    <!-- Sticky Glass Header -->
+    <header class="glass-header border-b border-slate-200/80 sticky top-0 z-30 shadow-xs flex-shrink-0">
+        <div class="w-full px-4 sm:px-6 lg:px-8 py-3 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
+            
+            <!-- Brand & Pulse Indicator -->
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-purple-600 text-white flex items-center justify-center font-extrabold text-base shadow-sm shadow-indigo-200 flex-shrink-0">
+                    <i class="fas fa-layer-group text-sm"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-extrabold tracking-tight text-slate-900 leading-tight">Job Fetcher</h1>
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Live
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 font-medium">QA Automation & Manual Testing Pipeline</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons Toolbar -->
+            <div class="flex flex-wrap gap-1.5 items-center" id="actionButtons">
+                <button onclick="openAddJobModal()" id="addJobBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shadow-indigo-200" title="Manually add an offer URL to NEW queue">
+                    <i class="fas fa-plus text-[11px]"></i> Add Offer
                 </button>
-                <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-                <button onclick="refreshJobs('JJIT')" id="refreshBtn-JJIT" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">JJIT</button>
-                <button onclick="refreshJobs('NFJ')" id="refreshBtn-NFJ" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">NFJ</button>
-                <button onclick="refreshJobs('PRACUJ')" id="refreshBtn-PRACUJ" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Pracuj</button>
-                <button onclick="refreshJobs('PROTOCOL')" id="refreshBtn-PROTOCOL" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Protocol</button>
-                <button onclick="refreshJobs('BULLDOG')" id="refreshBtn-BULLDOG" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Bulldog</button>
-                <button onclick="refreshJobs('SOLID')" id="refreshBtn-SOLID" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Solid</button>
-                <button onclick="refreshJobs('4PROGRAMMERS')" id="refreshBtn-4PROGRAMMERS" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">4prog</button>
-                <button onclick="refreshJobs('LINKEDIN')" id="refreshBtn-LINKEDIN" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">LinkedIn</button>
-                <button onclick="refreshJobs('ROCKET')" id="refreshBtn-ROCKET" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all">Rocket</button>
-                <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-                <button onclick="confirmDeepSearch()" id="refreshBtn-DEEP" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 active:scale-95">
-                    <i class="fas fa-search-plus"></i> Deep Search
+                <button onclick="refreshJobs('ALL')" id="refreshBtn-ALL" class="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 hover:shadow">
+                    <i class="fas fa-sync-alt text-[11px]"></i> Refresh ALL
                 </button>
-                <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-                <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-sm flex items-center gap-1.5 active:scale-95" title="Instant Alerts & Automation Settings">
-                    <i class="fas fa-bell text-gray-500"></i>
-                    <span>Alerts & Auto</span>
-                    <span id="autoScanPill" class="hidden text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.2 rounded-full">ON</span>
+                <div class="h-5 w-px bg-slate-200 mx-0.5 hidden xl:block"></div>
+                
+                <!-- Quick Portal Trigger Pills -->
+                <div class="hidden sm:flex items-center gap-1 flex-wrap">
+                    <button onclick="refreshJobs('JJIT')" id="refreshBtn-JJIT" class="portal-btn bg-amber-50 text-amber-800 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan Just Join IT">JJIT</button>
+                    <button onclick="refreshJobs('NFJ')" id="refreshBtn-NFJ" class="portal-btn bg-teal-50 text-teal-800 border border-teal-200/90 hover:bg-teal-100 hover:border-teal-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan No Fluff Jobs">NFJ</button>
+                    <button onclick="refreshJobs('PRACUJ')" id="refreshBtn-PRACUJ" class="portal-btn bg-blue-50 text-blue-800 border border-blue-200/90 hover:bg-blue-100 hover:border-blue-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan Pracuj.pl">Pracuj</button>
+                    <button onclick="refreshJobs('PROTOCOL')" id="refreshBtn-PROTOCOL" class="portal-btn bg-purple-50 text-purple-800 border border-purple-200/90 hover:bg-purple-100 hover:border-purple-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan The Protocol">Protocol</button>
+                    <button onclick="refreshJobs('BULLDOG')" id="refreshBtn-BULLDOG" class="portal-btn bg-yellow-50 text-yellow-800 border border-yellow-200/90 hover:bg-yellow-100 hover:border-yellow-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan Bulldogjob">Bulldog</button>
+                    <button onclick="refreshJobs('SOLID')" id="refreshBtn-SOLID" class="portal-btn bg-emerald-50 text-emerald-800 border border-emerald-200/90 hover:bg-emerald-100 hover:border-emerald-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan Solid.Jobs">Solid</button>
+                    <button onclick="refreshJobs('4PROGRAMMERS')" id="refreshBtn-4PROGRAMMERS" class="portal-btn bg-orange-50 text-orange-800 border border-orange-200/90 hover:bg-orange-100 hover:border-orange-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan 4programmers">4prog</button>
+                    <button onclick="refreshJobs('LINKEDIN')" id="refreshBtn-LINKEDIN" class="portal-btn bg-sky-50 text-sky-800 border border-sky-200/90 hover:bg-sky-100 hover:border-sky-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan LinkedIn">LinkedIn</button>
+                    <button onclick="refreshJobs('ROCKET')" id="refreshBtn-ROCKET" class="portal-btn bg-rose-50 text-rose-800 border border-rose-200/90 hover:bg-rose-100 hover:border-rose-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan RocketJobs">Rocket</button>
+                    <button onclick="refreshJobs('QABOARD')" id="refreshBtn-QABOARD" class="portal-btn bg-cyan-50 text-cyan-800 border border-cyan-200/90 hover:bg-cyan-100 hover:border-cyan-300 px-2.5 py-1.2 rounded-lg text-xs font-bold shadow-2xs transition-all active:scale-95" title="Scan QA Board">QABoard</button>
+                </div>
+
+                <div class="h-5 w-px bg-slate-200 mx-0.5 hidden sm:block"></div>
+                <button onclick="confirmDeepSearch()" id="refreshBtn-DEEP" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shadow-amber-200/50">
+                    <i class="fas fa-search-plus text-[11px]"></i> Deep Search
                 </button>
-                <button onclick="openInsightsModal()" id="insightsBtn" class="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 active:scale-95" title="Market & Salary Insights Dashboard">
-                    <i class="fas fa-chart-line text-indigo-600"></i>
+                
+                <button onclick="openSettingsModal()" id="settingsBtn" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all shadow-2xs flex items-center gap-1.5 active:scale-95" title="Instant Alerts & Automation Settings">
+                    <i class="fas fa-bell text-slate-400"></i>
+                    <span>Alerts</span>
+                    <span id="autoScanPill" class="hidden text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full">ON</span>
+                </button>
+                
+                <button onclick="openInsightsModal()" id="insightsBtn" class="bg-indigo-50/90 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 shadow-indigo-100" title="Market & Salary Insights Dashboard">
+                    <i class="fas fa-chart-pie text-indigo-600"></i>
                     <span>Insights</span>
                 </button>
             </div>
         </div>
         
-        <!-- Navigation Tabs -->
-        <div class="max-w-4xl mx-auto px-4 flex gap-8">
-            <button onclick="switchTab('ALL')" id="tab-ALL" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black font-semibold">ALL</button>
-            <button onclick="switchTab('NEW')" id="tab-NEW" class="pb-3 text-sm tab-active transition-colors hover:text-black">NEW</button>
-            <button onclick="switchTab('APPLIED')" id="tab-APPLIED" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black">APPLIED</button>
-            <button onclick="switchTab('IGNORED')" id="tab-IGNORED" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black">IGNORED</button>
-            <button onclick="switchTab('WRONG')" id="tab-WRONG" class="pb-3 text-sm text-gray-400 transition-colors hover:text-black">WRONG OFFERS</button>
+        <!-- Navigation Tabs & Contextual View Switcher -->
+        <div class="w-full px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between border-t border-slate-100 pt-2 pb-0.5">
+            <div class="flex gap-5 sm:gap-7">
+                <button onclick="switchTab('ALL')" id="tab-ALL" class="pb-2 text-xs text-slate-400 transition-colors hover:text-slate-900 font-semibold tracking-wide">ALL</button>
+                <button onclick="switchTab('NEW')" id="tab-NEW" class="pb-2 text-xs tab-active transition-colors hover:text-slate-900 tracking-wide">NEW</button>
+                <button onclick="switchTab('ACCEPTED')" id="tab-ACCEPTED" class="pb-2 text-xs text-slate-400 transition-colors hover:text-slate-900 flex items-center gap-1.5 tracking-wide">
+                    <span>ACCEPTED</span>
+                    <span id="tabBadge-ACCEPTED" class="hidden px-1.5 py-0.2 text-[10px] rounded-full bg-purple-100 text-purple-700 font-bold">0</span>
+                </button>
+                <button onclick="switchTab('IGNORED')" id="tab-IGNORED" class="pb-2 text-xs text-slate-400 transition-colors hover:text-slate-900 tracking-wide">IGNORED</button>
+                <button onclick="switchTab('WRONG')" id="tab-WRONG" class="pb-2 text-xs text-slate-400 transition-colors hover:text-slate-900 tracking-wide">WRONG OFFERS</button>
+            </div>
+
+            <!-- View Mode Switcher: Sleek Segmented Control (Visible ONLY on ACCEPTED tab) -->
+            <div id="viewModeSwitcher" class="hidden items-center gap-1 bg-slate-100/90 p-1 rounded-xl mb-1.5 text-xs border border-slate-200/70 shadow-inner">
+                <button onclick="setViewMode('list')" id="viewModeListBtn" class="px-3 py-1 rounded-lg font-semibold text-slate-800 bg-white shadow-xs flex items-center gap-1.5 transition-all">
+                    <i class="fas fa-list text-[11px] text-slate-600"></i> List View
+                </button>
+                <button onclick="setViewMode('board')" id="viewModeBoardBtn" class="px-3 py-1 rounded-lg font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1.5 transition-all">
+                    <i class="fas fa-columns text-[11px] text-indigo-500"></i> Jira Swimlanes
+                </button>
+            </div>
         </div>
         
         <!-- Search & Filter Controls Bar -->
-        <div class="max-w-4xl mx-auto px-4 pt-3 pb-2.5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 mt-1">
-            <div class="relative flex-1 min-w-[220px] max-w-sm">
-                <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Search title, company, notes, city..." class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-8 py-1.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:bg-white transition-all" />
-                <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"><i class="fas fa-times"></i></button>
+        <div class="w-full px-4 sm:px-6 lg:px-8 pt-2 pb-2.5 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 bg-white/50">
+            <div class="relative flex-1 min-w-[220px] max-w-md">
+                <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Search title, company, notes, city, skills..." class="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all shadow-2xs" />
+                <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"><i class="fas fa-times"></i></button>
             </div>
             
             <!-- Filter Chips & Export -->
             <div class="flex items-center gap-1.5 flex-wrap">
-                <button onclick="toggleFilter('salary')" id="chip-salary" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:border-gray-300 transition-all flex items-center gap-1">
-                    <i class="fas fa-coins text-amber-500"></i> With Salary
+                <button onclick="toggleFilter('salary')" id="chip-salary" class="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-slate-300 transition-all flex items-center gap-1 shadow-2xs">
+                    <i class="fas fa-coins text-amber-500 text-[10px]"></i> With Salary
                 </button>
-                <button onclick="toggleFilter('remote')" id="chip-remote" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:border-gray-300 transition-all flex items-center gap-1">
-                    <i class="fas fa-home text-blue-500"></i> Remote
+                <button onclick="toggleFilter('remote')" id="chip-remote" class="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-slate-300 transition-all flex items-center gap-1 shadow-2xs">
+                    <i class="fas fa-home text-blue-500 text-[10px]"></i> Remote
                 </button>
-                <button onclick="toggleFilter('tricity')" id="chip-tricity" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:border-gray-300 transition-all flex items-center gap-1">
-                    <i class="fas fa-water text-cyan-500"></i> Tricity
+                <button onclick="toggleFilter('tricity')" id="chip-tricity" class="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-slate-300 transition-all flex items-center gap-1 shadow-2xs">
+                    <i class="fas fa-water text-cyan-500 text-[10px]"></i> Tricity
                 </button>
                 
-                <select id="portalFilter" onchange="applyFilters()" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-600 focus:outline-none cursor-pointer">
+                <select id="portalFilter" onchange="applyFilters()" class="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-700 focus:outline-none cursor-pointer shadow-2xs">
                     <option value="ALL">All Portals</option>
                     <option value="LinkedIn">LinkedIn</option>
                     <option value="Pracuj">Pracuj</option>
@@ -93,12 +185,13 @@
                     <option value="Protocol">Protocol</option>
                     <option value="4programmers">4prog</option>
                     <option value="RocketJobs">Rocket</option>
+                    <option value="QABoard">QABoard</option>
                 </select>
 
                 <!-- Sort Dropdown -->
-                <div class="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-2.5 py-1 text-[11px] shadow-sm">
-                    <i class="fas fa-sort text-gray-400"></i>
-                    <select id="sortSelect" onchange="applySort(this.value)" class="bg-transparent font-medium text-gray-700 focus:outline-none cursor-pointer">
+                <div class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-2.5 py-1 text-[11px] shadow-2xs font-semibold text-slate-700">
+                    <i class="fas fa-sort text-slate-400 text-[10px]"></i>
+                    <select id="sortSelect" onchange="applySort(this.value)" class="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer">
                         <option value="date-desc">📅 Newest</option>
                         <option value="company-asc">🏢 Firm (A–Z)</option>
                         <option value="company-desc">🏢 Firm (Z–A)</option>
@@ -107,45 +200,431 @@
                     </select>
                 </div>
                 
-                <button onclick="exportCSV()" class="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-black transition-all flex items-center gap-1 ml-1" title="Download Excel-compatible CSV of current tab">
-                    <i class="fas fa-file-excel text-emerald-600"></i> Export CSV
+                <button onclick="exportCSV()" class="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-1 shadow-2xs ml-0.5" title="Download Excel-compatible CSV of current view">
+                    <i class="fas fa-file-excel text-emerald-600 text-[10px]"></i> Export CSV
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-4 py-8">
-        <div class="max-w-4xl mx-auto">
+    <!-- Main Content Area: Takes 100% of remaining screen height -->
+    <main class="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 custom-scrollbar">
+        
+        <!-- Loading Progress Bar & Live Scan Counters -->
+        <div id="loadingState" class="hidden flex-col items-center justify-center mt-8 mb-10 max-w-xl mx-auto w-full px-4">
+            <div class="text-xs font-extrabold text-slate-900 mb-2 tracking-[0.2em] uppercase flex items-center gap-2" id="progressTitle">
+                <i class="fas fa-radar text-indigo-600 animate-pulse"></i> Scraping Web...
+            </div>
             
-            <!-- Loading Progress Bar (Old Game Style + Sleek) -->
-            <div id="loadingState" class="hidden flex-col items-center justify-center mt-12 mb-12">
-                <div class="text-sm font-bold text-gray-900 mb-4 tracking-[0.2em] uppercase" id="progressTitle">Scraping Web...</div>
-                
-                <div class="w-full max-w-md bg-gray-200 h-2 mb-2 rounded-full overflow-hidden shadow-inner">
-                    <div id="progressBar" class="bg-black h-2 w-0 transition-all duration-300 ease-out"></div>
+            <div class="w-full bg-slate-200 h-2.5 mb-2 rounded-full overflow-hidden shadow-inner">
+                <div id="progressBar" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 h-2.5 w-0 transition-all duration-300 ease-out"></div>
+            </div>
+            <div class="flex justify-between w-full text-xs font-semibold text-slate-400 font-mono mb-3.5">
+                <span id="progressPercent">0%</span>
+                <span id="progressTime">Est. ~60s</span>
+            </div>
+
+            <!-- Live Scraping Counters (Updated On-The-Go) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full">
+                <div class="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs text-center flex flex-col justify-center">
+                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 flex items-center justify-center gap-1">
+                        <i class="fas fa-search text-slate-400 text-[9px]"></i> Scanned
+                    </span>
+                    <span id="liveCounterScanned" class="text-lg sm:text-xl font-black text-slate-800 font-mono mt-0.5">0</span>
                 </div>
-                
-                <div class="flex justify-between w-full max-w-md text-xs font-medium text-gray-500 font-mono">
-                    <span id="progressPercent">0%</span>
-                    <span id="progressTime">Est. ~60s</span>
+                <div class="bg-emerald-50/50 p-2.5 rounded-2xl border border-emerald-200/80 shadow-2xs text-center flex flex-col justify-center">
+                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-emerald-700 flex items-center justify-center gap-1">
+                        <i class="fas fa-check-circle text-emerald-500 text-[9px]"></i> QA Manual
+                    </span>
+                    <span id="liveCounterPassed" class="text-lg sm:text-xl font-black text-emerald-600 font-mono mt-0.5">0</span>
+                </div>
+                <div class="bg-rose-50/50 p-2.5 rounded-2xl border border-rose-200/80 shadow-2xs text-center flex flex-col justify-center">
+                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-rose-700 flex items-center justify-center gap-1">
+                        <i class="fas fa-robot text-rose-500 text-[9px]"></i> Automation
+                    </span>
+                    <span id="liveCounterAuto" class="text-lg sm:text-xl font-black text-rose-600 font-mono mt-0.5">0</span>
+                </div>
+                <div class="bg-amber-50/50 p-2.5 rounded-2xl border border-amber-200/80 shadow-2xs text-center flex flex-col justify-center">
+                    <span class="text-[10px] uppercase tracking-wider font-extrabold text-amber-700 flex items-center justify-center gap-1">
+                        <i class="fas fa-filter text-amber-500 text-[9px]"></i> Other / Loc
+                    </span>
+                    <span id="liveCounterOther" class="text-lg sm:text-xl font-black text-amber-600 font-mono mt-0.5">0</span>
                 </div>
             </div>
 
-            <!-- Job cards container -->
-            <div class="flex flex-col gap-4" id="jobList"></div>
-            
-            <!-- Simple spinner for local tab switching -->
-            <div id="simpleSpinner" class="hidden text-center text-gray-400 mt-10">
-                <i class="fas fa-circle-notch fa-spin text-2xl"></i>
+            <!-- Live Offer Ticker -->
+            <div class="w-full mt-3 px-3 py-2 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-[11px] text-slate-600 shadow-2xs">
+                <div class="flex items-center gap-2 truncate min-w-0 pr-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping flex-shrink-0"></span>
+                    <span id="liveCurrentPortal" class="font-extrabold text-indigo-700 uppercase flex-shrink-0">ALL</span>
+                    <span class="text-slate-300">•</span>
+                    <span id="liveCurrentJob" class="truncate text-slate-700 font-medium">Initializing scan...</span>
+                </div>
+                <span id="liveCurrentStatus" class="font-mono text-[10px] text-slate-400 font-semibold flex-shrink-0">Running</span>
+            </div>
+        </div>
+
+        <!-- Simple spinner for tab switching -->
+        <div id="simpleSpinner" class="hidden text-center text-slate-400 mt-16">
+            <i class="fas fa-circle-notch fa-spin text-2xl text-indigo-500"></i>
+        </div>
+
+        <!-- LIST VIEW CONTAINER -->
+        <div id="listViewContainer" class="max-w-4xl mx-auto">
+            <!-- Scrape Summary Banner on top of list (Dismissible) -->
+            <div id="scrapeSummaryBanner" class="hidden mb-4 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs hover:shadow-md transition-all animate-in fade-in duration-200">
+                <div class="flex items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-start sm:items-center gap-3.5 min-w-0">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 border border-indigo-100 shadow-2xs mt-0.5 sm:mt-0">
+                            <i class="fas fa-satellite-dish text-base"></i>
+                        </div>
+                        <div>
+                            <div class="font-extrabold text-sm text-slate-900 flex items-center gap-2" id="summaryBannerTitle">
+                                Found 0 offers, rejected 0 of them, 0 were added to NEW.
+                            </div>
+                            <div class="flex items-center gap-2 mt-1.5 text-[11px] text-slate-600 flex-wrap" id="summaryBannerChips">
+                                <!-- Dynamic breakdown chips -->
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="dismissSummaryBanner()" class="h-8 w-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-2xs border border-slate-200 hover:border-rose-200 flex-shrink-0 cursor-pointer" title="Dismiss summary">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3.5" id="jobList"></div>
+        </div>
+
+        <!-- JIRA SWIMLANES / KANBAN BOARD CONTAINER (FULL WIDTH 6-COLUMN RESPONSIVE GRID) -->
+        <div id="boardViewContainer" class="hidden w-full h-full flex flex-col">
+            <!-- Board Subheader -->
+            <div class="flex items-center justify-between mb-3 px-1 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <i class="fas fa-columns text-indigo-500"></i> Accepted Pipeline Swimlanes
+                    </span>
+                    <span class="text-[11px] text-slate-400 font-medium hidden md:inline">• Drag & drop cards or click arrows to move stages</span>
+                </div>
+                <span id="boardTotalCount" class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">0 Accepted Offers</span>
+            </div>
+
+            <!-- 6 Full-Width Responsive Swimlane Columns -->
+            <div class="w-full flex-1 overflow-x-auto pb-4 custom-scrollbar">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 w-full min-w-[1100px] xl:min-w-0 items-start">
+                    
+                    <!-- Column 1: To Apply -->
+                    <div class="bg-slate-100/90 rounded-2xl p-3 border border-slate-200/90 flex flex-col transition-all duration-150" 
+                         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'To Apply')">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80 sticky top-0 bg-slate-100/90 z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-slate-500 ring-2 ring-slate-200"></span>
+                                <span class="font-extrabold text-xs text-slate-800 tracking-tight">To Apply</span>
+                            </div>
+                            <span id="count-col-To Apply" class="text-[11px] font-bold bg-white text-slate-700 px-2 py-0.2 rounded-full shadow-2xs border border-slate-200/60">0</span>
+                        </div>
+                        <div id="cards-col-To Apply" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                    </div>
+
+                    <!-- Column 2: Applied -->
+                    <div class="bg-purple-50/60 rounded-2xl p-3 border border-purple-200/80 flex flex-col transition-all duration-150"
+                         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Applied')">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-purple-200/80 sticky top-0 bg-purple-50/90 z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-purple-600 ring-2 ring-purple-200"></span>
+                                <span class="font-extrabold text-xs text-purple-950 tracking-tight">Applied</span>
+                            </div>
+                            <span id="count-col-Applied" class="text-[11px] font-bold bg-white text-purple-700 px-2 py-0.2 rounded-full shadow-2xs border border-purple-200/60">0</span>
+                        </div>
+                        <div id="cards-col-Applied" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                    </div>
+
+                    <!-- Column 3: Recruiter Screen -->
+                    <div class="bg-blue-50/60 rounded-2xl p-3 border border-blue-200/80 flex flex-col transition-all duration-150"
+                         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Recruiter Screen')">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-blue-200/80 sticky top-0 bg-blue-50/90 z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-blue-600 ring-2 ring-blue-200"></span>
+                                <span class="font-extrabold text-xs text-blue-950 tracking-tight">Screening</span>
+                            </div>
+                            <span id="count-col-Recruiter Screen" class="text-[11px] font-bold bg-white text-blue-700 px-2 py-0.2 rounded-full shadow-2xs border border-blue-200/60">0</span>
+                        </div>
+                        <div id="cards-col-Recruiter Screen" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                    </div>
+
+                    <!-- Column 4: Tech Interview -->
+                    <div class="bg-amber-50/60 rounded-2xl p-3 border border-amber-200/80 flex flex-col transition-all duration-150"
+                         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Tech Interview')">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-amber-200/80 sticky top-0 bg-amber-50/90 z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-200"></span>
+                                <span class="font-extrabold text-xs text-amber-950 tracking-tight">Tech Interview</span>
+                            </div>
+                            <span id="count-col-Tech Interview" class="text-[11px] font-bold bg-white text-amber-700 px-2 py-0.2 rounded-full shadow-2xs border border-amber-200/60">0</span>
+                        </div>
+                        <div id="cards-col-Tech Interview" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                    </div>
+
+                    <!-- Column 5: Offer -->
+                    <div class="bg-emerald-50/60 rounded-2xl p-3 border border-emerald-200/80 flex flex-col transition-all duration-150"
+                         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Offer')">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-emerald-200/80 sticky top-0 bg-emerald-50/90 z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-200"></span>
+                                <span class="font-extrabold text-xs text-emerald-950 tracking-tight">Offer 🎉</span>
+                            </div>
+                            <span id="count-col-Offer" class="text-[11px] font-bold bg-white text-emerald-700 px-2 py-0.2 rounded-full shadow-2xs border border-emerald-200/60">0</span>
+                        </div>
+                        <div id="cards-col-Offer" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                    </div>
+
+                    <!-- Column 6: Rejected -->
+                    <div class="bg-rose-50/60 rounded-2xl p-3 border border-rose-200/80 flex flex-col transition-all duration-150"
+                         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'Rejected')">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-rose-200/80 sticky top-0 bg-rose-50/90 z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200"></span>
+                                <span class="font-extrabold text-xs text-rose-950 tracking-tight">Rejected</span>
+                            </div>
+                            <span id="count-col-Rejected" class="text-[11px] font-bold bg-white text-rose-700 px-2 py-0.2 rounded-full shadow-2xs border border-rose-200/60">0</span>
+                        </div>
+                        <div id="cards-col-Rejected" class="kanban-col-body overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-0.5"></div>
+                    </div>
+
+                </div>
             </div>
         </div>
     </main>
 
+    <!-- ADD JOB OFFER MANUALLY MODAL -->
+    <div id="addJobModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-slate-50/60">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                        <i class="fas fa-plus text-xs"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-sm">Add Offer by URL</h3>
+                        <p class="text-xs text-slate-500 font-medium">Add manual link to NEW queue with highlighted emphasis</p>
+                    </div>
+                </div>
+                <button onclick="closeAddJobModal()" class="text-slate-400 hover:text-slate-700 w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            
+            <form id="addJobForm" onsubmit="submitAddJobForm(event)" class="p-6 space-y-4 text-xs">
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block font-bold text-slate-700">Job Offer URL: <span class="text-rose-500">*</span></label>
+                        <button type="button" onclick="autoDetectMetadataFromUrl()" id="autoFetchBtn" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer">
+                            <i class="fas fa-wand-magic-sparkles text-[10px]"></i> Auto-fetch details
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <input type="url" id="addJobUrl" required placeholder="https://justjoin.it/job-offer/... or Pracuj, NFJ, LinkedIn..." 
+                               oninput="onAddJobUrlChange()"
+                               class="w-full bg-slate-50/80 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white focus:outline-none shadow-2xs transition-all" />
+                    </div>
+                </div>
+
+                <div id="addJobPreviewStatus" class="hidden text-xs py-2 px-3 rounded-xl font-medium bg-slate-100 text-slate-600 flex items-center gap-2">
+                    <i class="fas fa-circle-notch fa-spin text-indigo-600"></i>
+                    <span>Fetching offer title & details...</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Position / Title <span class="text-slate-400 font-normal">(optional)</span>:</label>
+                        <input type="text" id="addJobTitle" placeholder="e.g. QA Manual Tester (auto-detected if blank)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Company <span class="text-slate-400 font-normal">(optional)</span>:</label>
+                        <input type="text" id="addJobCompany" placeholder="e.g. Acme Software" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Source / Portal:</label>
+                        <input type="text" id="addJobSource" placeholder="Auto / Manual" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">City / Remote:</label>
+                        <input type="text" id="addJobCity" placeholder="e.g. Remote or Gdańsk" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Contract Type:</label>
+                        <select id="addJobContractType" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs">
+                            <option value="">Auto Detect</option>
+                            <option value="B2B">B2B</option>
+                            <option value="UoP">UoP</option>
+                            <option value="B2B / UoP">B2B / UoP</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Salary Range:</label>
+                        <input type="text" id="addJobPay" placeholder="e.g. 10 000 - 14 000 PLN" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                </div>
+
+                <div class="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl flex items-start gap-2.5 text-[11px] text-amber-900">
+                    <i class="fas fa-sparkles text-amber-600 mt-0.5 text-xs flex-shrink-0"></i>
+                    <div>
+                        <span class="font-bold">Highlight Note:</span> This offer will appear in the <span class="font-bold uppercase">NEW</span> queue with a special emphasized background. Once moved to any other tab (Accepted, Ignored, Wrong), the highlight is permanently removed.
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeAddJobModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">Cancel</button>
+                    <button type="submit" id="addJobSubmitBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                        <i class="fas fa-plus"></i>
+                        <span>Add to NEW</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DUPLICATE JOB OVERRIDE MODAL -->
+    <div id="duplicateJobModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-amber-100 flex justify-between items-center bg-amber-50/70">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-sm">Offer Already Exists</h3>
+                        <p class="text-[11px] text-amber-800 font-medium">Duplicate Detected</p>
+                    </div>
+                </div>
+                <button onclick="closeDuplicateModal()" class="text-slate-400 hover:text-slate-700 w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-3.5 text-xs text-slate-700">
+                <p class="font-medium text-slate-600">This job offer is already recorded in your tracker:</p>
+                <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1">
+                    <div class="text-slate-900 font-bold line-clamp-2" id="duplicateOfferTitle"></div>
+                    <div class="text-slate-500 text-[11px]" id="duplicateOfferCompany"></div>
+                    <div class="flex items-center gap-2 pt-1 text-[11px]">
+                        <span class="font-bold text-slate-500">Current Queue:</span>
+                        <span id="duplicateOfferStatus" class="font-extrabold text-indigo-600 uppercase"></span>
+                        <span class="text-slate-300">•</span>
+                        <span class="font-bold text-slate-500">Stage:</span>
+                        <span id="duplicateOfferStage" class="font-semibold text-slate-800"></span>
+                    </div>
+                </div>
+                <p class="text-slate-500 text-[11px]">
+                    Do you want to override and move this offer back to the <strong class="text-slate-800 uppercase">NEW</strong> queue with manual highlight?
+                </p>
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeDuplicateModal()" class="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">Keep Existing & Cancel</button>
+                    <button type="button" onclick="confirmOverrideDuplicate()" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                        <i class="fas fa-arrow-rotate-right"></i>
+                        <span>Override & Move to NEW</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT JOB DETAILS & PIPELINE MODAL -->
+    <div id="jobDetailsModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-sm" id="modalJobTitle">Edit Job Details</h3>
+                    <p class="text-xs text-slate-500 truncate max-w-xs font-medium" id="modalJobCompany"></p>
+                </div>
+                <button onclick="closeJobDetailsModal()" class="text-slate-400 hover:text-slate-700 w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            
+            <form id="modalJobForm" onsubmit="saveJobDetailsFromModal(event)" class="p-6 space-y-4 text-xs">
+                <input type="hidden" id="modalJobId" />
+                
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1.5">Pipeline Stage:</label>
+                    <select id="modalJobStage" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs">
+                        <option value="To Apply">📝 To Apply (New, yet to apply)</option>
+                        <option value="Applied">🟣 Applied (Application sent)</option>
+                        <option value="Recruiter Screen">🔵 Recruiter Screen (HR call)</option>
+                        <option value="Tech Interview">🟡 Tech Interview (Coding/Tech)</option>
+                        <option value="Offer">🟢 Offer (Job offered!)</option>
+                        <option value="Rejected">🔴 Rejected (Closed)</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1.5">Expected / Asked Salary:</label>
+                        <input type="text" id="modalJobSalary" placeholder="e.g. 16 000 B2B or 13k UoP" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1.5">Next Interview / Call:</label>
+                        <input type="datetime-local" id="modalJobDate" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1.5">Recruiter Notes & Task Details:</label>
+                    <textarea id="modalJobNotes" rows="3" placeholder="e.g. Discussed with HR. Technical interview on Monday with Tech Lead..." class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs"></textarea>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div class="flex gap-2">
+                        <button type="button" onclick="moveJobFromModal('NEW')" class="text-xs text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-colors font-semibold">
+                            <i class="fas fa-undo mr-1"></i>Move to New
+                        </button>
+                        <button type="button" onclick="moveJobFromModal('IGNORED')" class="text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors font-semibold">
+                            <i class="fas fa-times mr-1"></i>Ignore
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeJobDetailsModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900">Cancel</button>
+                        <button type="submit" id="modalSaveBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95">
+                            <i class="fas fa-check mr-1"></i> Save
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
     <script>
+        const STAGES = ['To Apply', 'Applied', 'Recruiter Screen', 'Tech Interview', 'Offer', 'Rejected'];
+        const STAGE_COLORS = {
+            'To Apply': 'bg-slate-100 text-slate-700 border-slate-300',
+            'Applied': 'bg-purple-50 text-purple-700 border-purple-200',
+            'Recruiter Screen': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Tech Interview': 'bg-amber-50 text-amber-700 border-amber-200',
+            'Offer': 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold',
+            'Rejected': 'bg-rose-50 text-rose-700 border-rose-200'
+        };
+
+        const PORTAL_COLORS = {
+            'LinkedIn': 'bg-sky-50 text-sky-700 border-sky-200',
+            'Pracuj': 'bg-blue-50 text-blue-700 border-blue-200',
+            'NFJ': 'bg-teal-50 text-teal-700 border-teal-200',
+            'JJIT': 'bg-amber-50 text-amber-800 border-amber-200',
+            'Bulldog': 'bg-yellow-50 text-yellow-800 border-yellow-200',
+            'Solid': 'bg-emerald-50 text-emerald-800 border-emerald-200',
+            'Protocol': 'bg-purple-50 text-purple-800 border-purple-200',
+            '4programmers': 'bg-orange-50 text-orange-800 border-orange-200',
+            'RocketJobs': 'bg-rose-50 text-rose-700 border-rose-200',
+            'QABoard': 'bg-cyan-50 text-cyan-800 border-cyan-200'
+        };
+
         let currentTab = 'NEW';
+        let viewMode = 'list'; // 'list' | 'board' (board allowed ONLY when currentTab === 'ACCEPTED')
         let progressInterval = null;
         let allCurrentJobs = [];
+        let acceptedJobsCount = 0;
         let currentSort = 'date-desc';
         let activeFilters = {
             salary: false,
@@ -155,26 +634,102 @@
             search: ''
         };
 
+        function setViewMode(mode) {
+            // Swimlanes/Board view is strictly allowed ONLY on the ACCEPTED tab
+            if (mode === 'board' && currentTab !== 'ACCEPTED') {
+                mode = 'list';
+            }
+
+            viewMode = mode;
+            const listBtn = document.getElementById('viewModeListBtn');
+            const boardBtn = document.getElementById('viewModeBoardBtn');
+            const listCont = document.getElementById('listViewContainer');
+            const boardCont = document.getElementById('boardViewContainer');
+
+            if (mode === 'board') {
+                if (listBtn) {
+                    listBtn.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+                    listBtn.classList.add('text-slate-500');
+                }
+                if (boardBtn) {
+                    boardBtn.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+                    boardBtn.classList.remove('text-slate-500');
+                }
+
+                if (listCont) listCont.classList.add('hidden');
+                if (boardCont) boardCont.classList.remove('hidden');
+            } else {
+                if (boardBtn) {
+                    boardBtn.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+                    boardBtn.classList.add('text-slate-500');
+                }
+                if (listBtn) {
+                    listBtn.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+                    listBtn.classList.remove('text-slate-500');
+                }
+
+                if (boardCont) boardCont.classList.add('hidden');
+                if (listCont) listCont.classList.remove('hidden');
+            }
+
+            applyFilters();
+        }
+
         async function fetchJobs() {
             const listEl = document.getElementById('jobList');
             const spinner = document.getElementById('simpleSpinner');
             const loadingState = document.getElementById('loadingState');
             
-            // Only show simple spinner if we aren't currently showing the big progress bar
             if(loadingState.classList.contains('hidden')) {
                 listEl.innerHTML = '';
                 spinner.classList.remove('hidden');
             }
             
             try {
-                const response = await fetch(`/api/jobs?status=${currentTab}`);
+                // When on ACCEPTED tab, query APPLIED from backend for universal compatibility
+                const queryStatus = (currentTab === 'ACCEPTED') ? 'APPLIED' : currentTab;
+                const response = await fetch(`/api/jobs?status=${encodeURIComponent(queryStatus)}`);
                 const jobs = await response.json();
                 allCurrentJobs = jobs || [];
+
+                if (currentTab === 'ACCEPTED') {
+                    updateAcceptedBadge(allCurrentJobs.length);
+                } else {
+                    fetchAcceptedCount();
+                }
+
                 spinner.classList.add('hidden');
                 applyFilters();
             } catch (e) {
                 spinner.classList.add('hidden');
                 listEl.innerHTML = '<div class="text-center text-red-500 mt-10">Error loading jobs. Is the server running?</div>';
+            }
+        }
+
+        async function fetchAcceptedCount() {
+            try {
+                const res = await fetch('/api/jobs?status=APPLIED');
+                const list = await res.json();
+                if (Array.isArray(list)) {
+                    updateAcceptedBadge(list.length);
+                }
+            } catch(e) {}
+        }
+
+        function updateAcceptedBadge(count) {
+            acceptedJobsCount = count;
+            const badge = document.getElementById('tabBadge-ACCEPTED');
+            if (badge) {
+                if (count > 0) {
+                    badge.innerText = count;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+            const boardTotal = document.getElementById('boardTotalCount');
+            if (boardTotal) {
+                boardTotal.innerText = `${count} Accepted Offers`;
             }
         }
 
@@ -186,11 +741,123 @@
             const vals = nums.map(Number).filter(n => n > 10);
             if (!vals.length) return -1;
             let maxV = Math.max(...vals);
-            if (pay.toLowerCase().includes('godz') || pay.toLowerCase().includes('hour')) maxV *= 168;
-            else if (pay.toLowerCase().includes('dzien') || pay.toLowerCase().includes('day')) maxV *= 21;
-            else if (pay.toLowerCase().includes('rok') || pay.toLowerCase().includes('year')) maxV /= 12;
+            const lower = pay.toLowerCase();
+            if (lower.includes('godz') || lower.includes('hour') || lower.includes('/ h') || lower.includes('/h')) maxV *= 168;
+            else if (lower.includes('dzien') || lower.includes('day') || lower.includes('/ d') || lower.includes('/d')) maxV *= 21;
+            else if (lower.includes('rok') || lower.includes('year') || lower.includes('/ y') || lower.includes('/y')) maxV /= 12;
             if (pay.includes('EUR') || pay.includes('€')) maxV *= 4.3;
             return maxV;
+        }
+
+        function calculateNetTakeHome(payStr) {
+            if (!payStr || payStr === 'Not given' || payStr === 'brak widełek') return null;
+            
+            const cleaned = payStr.replace(/\xa0/g, ' ').replace(',', '.');
+            const cleanedNumStr = cleaned.replace(/(\d+)\s+(\d{3})/g, '$1$2');
+            const nums = cleanedNumStr.match(/\b\d+(?:\.\d+)?\b/g);
+            if (!nums) return null;
+            
+            const floats = nums.map(Number).filter(n => n > 5);
+            if (!floats.length) return null;
+            
+            const minV = Math.min(...floats);
+            const maxV = Math.max(...floats);
+            let avgGross = (minV + maxV) / 2.0;
+            
+            const isEur = payStr.includes('EUR') || payStr.includes('€');
+            if (isEur) {
+                avgGross *= 4.30;
+            }
+            
+            const lower = payStr.toLowerCase();
+            const isHourly = lower.includes('/ h') || lower.includes('/h') || lower.includes('godz') || lower.includes('hour');
+            const isDaily = lower.includes('/ d') || lower.includes('/d') || lower.includes('dzien') || lower.includes('day');
+            const isYearly = lower.includes('/ y') || lower.includes('/y') || lower.includes('rok') || lower.includes('year');
+            
+            let monthlyBase = avgGross;
+            if (isHourly) {
+                monthlyBase = avgGross * 168; // 21 working days * 8h
+            } else if (isDaily) {
+                monthlyBase = avgGross * 21; // 21 working days
+            } else if (isYearly) {
+                monthlyBase = avgGross / 12.0;
+            } else {
+                if (avgGross < 300 && !isEur) {
+                    monthlyBase = avgGross * 168;
+                } else {
+                    monthlyBase = avgGross;
+                }
+            }
+            
+            // Contract detection
+            const isB2b = isHourly || isDaily || lower.includes('b2b') || monthlyBase >= 14000;
+            
+            if (isB2b) {
+                // B2B Ryczałt 8.5% (Poland 2026 Manual QA standard)
+                // ZUS Społeczne (Duży ZUS 2026): ~1 750 PLN
+                // Składka Zdrowotna Ryczałt Tier 2 (revenue 60k-300k/yr): ~770 PLN
+                // Księgowość: ~250 PLN
+                const zusSpol = 1750.0;
+                const health = 770.0;
+                const accounting = 250.0;
+                const taxBase = Math.max(0, monthlyBase - (0.5 * health) - zusSpol);
+                const taxRyczalt = taxBase * 0.085;
+                const net = monthlyBase - zusSpol - health - taxRyczalt - accounting;
+                return {
+                    net_monthly: Math.round(net),
+                    contract_type: 'B2B',
+                    monthly_base: Math.round(monthlyBase)
+                };
+            } else {
+                // UoP (Umowa o Pracę)
+                // ZUS Pracownika: 13.71%
+                const zusPracownik = monthlyBase * 0.1371;
+                const healthBase = monthlyBase - zusPracownik;
+                const health = healthBase * 0.09;
+                const kup = 250.0; // Standardowe koszty uzyskania przychodu
+                const taxBase = Math.max(0, healthBase - kup);
+                
+                // Skala podatkowa 2026: 12% do 120k rocznie, 32% powyżej; kwota wolna 30k (300 PLN / m-c)
+                const annualTaxBase = taxBase * 12.0;
+                let annualPit = 0;
+                if (annualTaxBase <= 120000) {
+                    annualPit = Math.max(0, (annualTaxBase * 0.12) - 3600.0);
+                } else {
+                    annualPit = (120000 * 0.12 - 3600.0) + ((annualTaxBase - 120000) * 0.32);
+                }
+                const monthlyPit = annualPit / 12.0;
+                const net = monthlyBase - zusPracownik - health - monthlyPit;
+                return {
+                    net_monthly: Math.round(net),
+                    contract_type: 'UoP',
+                    monthly_base: Math.round(monthlyBase)
+                };
+            }
+        }
+
+        function getContractTypeBadge(job, isCompact = false) {
+            let ctype = (job.contract_type || '').trim();
+            if (!ctype) {
+                const netInfo = calculateNetTakeHome(job.pay);
+                ctype = netInfo ? netInfo.contract_type : 'B2B / UoP';
+            }
+
+            if (ctype === 'B2B') {
+                if (isCompact) {
+                    return `<span class="text-[10px] font-bold text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-md border border-violet-200/60 shadow-2xs flex items-center gap-1" title="B2B Contract"><i class="fas fa-briefcase text-violet-500 text-[9px]"></i>B2B</span>`;
+                }
+                return `<span class="text-xs font-bold text-violet-700 bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-200/60 shadow-2xs flex items-center gap-1" title="B2B Contract"><i class="fas fa-briefcase text-violet-500 text-[10px]"></i>B2B</span>`;
+            } else if (ctype === 'UoP') {
+                if (isCompact) {
+                    return `<span class="text-[10px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-md border border-sky-200/60 shadow-2xs flex items-center gap-1" title="Employment Contract (Umowa o Pracę)"><i class="fas fa-id-card text-sky-500 text-[9px]"></i>UoP</span>`;
+                }
+                return `<span class="text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-200/60 shadow-2xs flex items-center gap-1" title="Employment Contract (Umowa o Pracę)"><i class="fas fa-id-card text-sky-500 text-[10px]"></i>UoP</span>`;
+            } else {
+                if (isCompact) {
+                    return `<span class="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-200/60 shadow-2xs flex items-center gap-1" title="Both B2B and UoP available"><i class="fas fa-layer-group text-indigo-500 text-[9px]"></i>B2B / UoP</span>`;
+                }
+                return `<span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-200/60 shadow-2xs flex items-center gap-1" title="Both B2B and UoP available"><i class="fas fa-layer-group text-indigo-500 text-[10px]"></i>B2B / UoP</span>`;
+            }
         }
 
         function applySort(sortVal) {
@@ -285,7 +952,12 @@
             });
 
             const isFiltered = activeFilters.salary || activeFilters.remote || activeFilters.tricity || (activeFilters.portal !== 'ALL') || Boolean(activeFilters.search);
-            renderJobs(filtered, isFiltered);
+            
+            if (currentTab === 'ACCEPTED' && viewMode === 'board') {
+                renderKanbanBoard(filtered, isFiltered);
+            } else {
+                renderJobs(filtered, isFiltered);
+            }
         }
 
         function toggleFilter(filterName) {
@@ -293,11 +965,11 @@
             const chip = document.getElementById(`chip-${filterName}`);
             if (chip) {
                 if (activeFilters[filterName]) {
-                    chip.classList.add('bg-black', 'text-white', 'border-black');
-                    chip.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
+                    chip.classList.add('bg-slate-900', 'text-white', 'border-slate-900', 'shadow-xs');
+                    chip.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
                 } else {
-                    chip.classList.remove('bg-black', 'text-white', 'border-black');
-                    chip.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+                    chip.classList.remove('bg-slate-900', 'text-white', 'border-slate-900', 'shadow-xs');
+                    chip.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
                 }
             }
             applyFilters();
@@ -314,8 +986,8 @@
                 activeFilters[f] = false;
                 const chip = document.getElementById(`chip-${f}`);
                 if (chip) {
-                    chip.classList.remove('bg-black', 'text-white', 'border-black');
-                    chip.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+                    chip.classList.remove('bg-slate-900', 'text-white', 'border-slate-900', 'shadow-xs');
+                    chip.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
                 }
             });
             const portalSelect = document.getElementById('portalFilter');
@@ -325,161 +997,194 @@
         }
 
         function exportCSV() {
-            window.location.href = `/api/export/csv?status=${encodeURIComponent(currentTab)}`;
+            const exportStatus = (currentTab === 'ACCEPTED') ? 'APPLIED' : currentTab;
+            window.location.href = `/api/export/csv?status=${encodeURIComponent(exportStatus)}`;
         }
 
+        // ==========================================
+        // RENDER: Standard List View
+        // ==========================================
         function renderJobs(jobs, isFiltered = false) {
             const listEl = document.getElementById('jobList');
-            listEl.innerHTML = ''; // Clear previous
+            listEl.innerHTML = '';
 
             if (jobs.length === 0) {
                 if (isFiltered) {
                     listEl.innerHTML = `
-                        <div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-200">
-                            <div class="text-gray-400 text-3xl mb-2"><i class="fas fa-filter"></i></div>
-                            <div class="text-sm font-medium text-gray-700">No jobs match your search or active filters.</div>
-                            <div class="mt-2">
-                                <button onclick="clearAllFilters()" class="text-xs text-blue-600 hover:text-blue-800 font-semibold underline">Reset all filters</button>
+                        <div class="text-center py-14 bg-white rounded-3xl border border-dashed border-slate-200 shadow-2xs">
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 mx-auto flex items-center justify-center text-lg mb-3">
+                                <i class="fas fa-filter"></i>
+                            </div>
+                            <div class="text-sm font-bold text-slate-800">No offers match your current filter selection.</div>
+                            <div class="mt-2.5">
+                                <button onclick="clearAllFilters()" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer">Reset all active filters</button>
                             </div>
                         </div>
                     `;
                 } else {
-                    listEl.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm">No jobs found in ${currentTab}.</div>`;
+                    listEl.innerHTML = `<div class="text-center text-slate-400 mt-14 text-sm font-medium">No offers in ${currentTab} queue.</div>`;
                 }
                 return;
             }
 
             jobs.forEach((job, index) => {
+                const isManualNew = Boolean(job.is_manual) && (job.status === 'NEW' || currentTab === 'NEW');
+
                 const card = document.createElement('div');
-                card.className = 'bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow group job-card-enter';
-                card.style.animationDelay = `${Math.min(index * 30, 500)}ms`;
+                let cardBgClass = 'bg-white p-4 sm:p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col hover:shadow-md hover:border-slate-300 transition-all group job-card-enter';
+                if (isManualNew) {
+                    cardBgClass = 'bg-gradient-to-r from-amber-50/90 via-amber-50/45 to-white p-4 sm:p-5 rounded-2xl shadow-xs border-2 border-amber-300/90 flex flex-col hover:shadow-md hover:border-amber-400 transition-all group job-card-enter ring-1 ring-amber-200/50';
+                }
+                card.className = cardBgClass;
+                card.style.animationDelay = `${Math.min(index * 20, 300)}ms`;
                 
                 // Status chip for ALL view
                 let statusChipHtml = '';
                 if (currentTab === 'ALL') {
                     if (job.status === 'NEW') {
-                        statusChipHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 tracking-wider uppercase">NEW</span>`;
-                    } else if (job.status === 'APPLIED') {
-                        statusChipHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 tracking-wider uppercase">APPLIED</span>`;
+                        statusChipHtml = `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 tracking-wider uppercase">NEW</span>`;
+                    } else if (job.status === 'APPLIED' || job.status === 'ACCEPTED') {
+                        statusChipHtml = `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 tracking-wider uppercase">ACCEPTED</span>`;
                     } else if (job.status === 'IGNORED') {
-                        statusChipHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 tracking-wider uppercase">IGNORED</span>`;
+                        statusChipHtml = `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 tracking-wider uppercase">IGNORED</span>`;
                     }
+                }
+
+                // Manual badge for NEW queue
+                let manualBadgeHtml = '';
+                if (isManualNew) {
+                    manualBadgeHtml = `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300/80 tracking-wider uppercase flex items-center gap-1 shadow-2xs"><i class="fas fa-star text-amber-600 text-[9px]"></i> MANUAL</span>`;
                 }
 
                 // Actions block depends on tab
                 let actionsHtml = '';
                 if (currentTab === 'NEW' || (currentTab === 'ALL' && job.status === 'NEW')) {
                     actionsHtml = `
-                        <button onclick="updateStatus(${job.id}, 'APPLIED')" class="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-all" title="Move to Applied">
-                            <i class="fas fa-check text-lg"></i>
+                        <button onclick="updateStatus(${job.id}, 'APPLIED')" class="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-2xs border border-slate-100 hover:border-emerald-200 cursor-pointer" title="Accept / Shortlist (Move to Accepted)">
+                            <i class="fas fa-check text-sm"></i>
                         </button>
-                        <button onclick="updateStatus(${job.id}, 'IGNORED')" class="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all" title="Ignore / Deny">
-                            <i class="fas fa-times text-lg"></i>
+                        <button onclick="updateStatus(${job.id}, 'IGNORED')" class="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-2xs border border-slate-100 hover:border-rose-200 cursor-pointer" title="Ignore / Deny">
+                            <i class="fas fa-times text-sm"></i>
                         </button>
-                        <button onclick="updateStatus(${job.id}, 'WRONG')" class="h-10 w-10 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all" title="Wrong offer">
-                            <i class="fas fa-ban text-lg"></i>
+                        <button onclick="updateStatus(${job.id}, 'WRONG')" class="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-2xs border border-slate-100 hover:border-amber-200 cursor-pointer" title="Wrong offer">
+                            <i class="fas fa-ban text-sm"></i>
                         </button>
                     `;
-                } else if (currentTab === 'APPLIED' || (currentTab === 'ALL' && job.status === 'APPLIED')) {
+                } else if (currentTab === 'ACCEPTED' || currentTab === 'APPLIED' || (currentTab === 'ALL' && (job.status === 'APPLIED' || job.status === 'ACCEPTED'))) {
                     actionsHtml = `
-                        <button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Move back to New">
+                        <button onclick="updatePipelineStage(${job.id}, 'Rejected')" class="h-8 w-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-2xs border border-slate-100 hover:border-rose-200 cursor-pointer" title="Reject offer (Move to Rejected stage)">
+                            <i class="fas fa-times text-xs"></i>
+                        </button>
+                        <button onclick="openJobDetailsModal(${job.id})" class="h-8 px-2.5 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl font-bold transition-all flex items-center gap-1.5 border border-indigo-200/60 shadow-2xs cursor-pointer">
+                            <i class="fas fa-edit text-[11px]"></i> Details
+                        </button>
+                        <button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all font-medium cursor-pointer" title="Move back to New">
                             <i class="fas fa-undo mr-1"></i>Undo
                         </button>
                     `;
-                } else if (currentTab === 'IGNORED' || (currentTab === 'ALL' && job.status === 'IGNORED')) {
-                    actionsHtml = `<button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Restore to New"><i class="fas fa-undo mr-1"></i>Restore</button>`;
                 } else {
-                    actionsHtml = `<button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Restore to New"><i class="fas fa-undo mr-1"></i>Restore</button>`;
+                    actionsHtml = `<button onclick="updateStatus(${job.id}, 'NEW')" class="h-8 px-2.5 text-xs text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all font-semibold cursor-pointer" title="Restore to New"><i class="fas fa-undo mr-1"></i>Restore</button>`;
                 }
 
                 const dateObj = new Date(job.created_at + 'Z'); 
                 const dateString = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
                 let pipelineHtml = '';
-                if (currentTab === 'APPLIED' || (currentTab === 'ALL' && job.status === 'APPLIED')) {
-                    const stage = job.stage || 'Applied';
-                    const stageColors = {
-                        'Applied': 'bg-purple-50 text-purple-700 border-purple-200',
-                        'Recruiter Screen': 'bg-blue-50 text-blue-700 border-blue-200',
-                        'Tech Interview': 'bg-amber-50 text-amber-700 border-amber-200',
-                        'Offer': 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold',
-                        'Rejected': 'bg-rose-50 text-rose-700 border-rose-200'
-                    };
-                    const stageClass = stageColors[stage] || stageColors['Applied'];
+                if (currentTab === 'ACCEPTED' || currentTab === 'APPLIED' || (currentTab === 'ALL' && (job.status === 'APPLIED' || job.status === 'ACCEPTED'))) {
+                    const stage = (job.stage && STAGES.includes(job.stage)) ? job.stage : 'Applied';
+                    const stageClass = STAGE_COLORS[stage] || STAGE_COLORS['Applied'];
                     
                     const appliedDays = Math.floor((Date.now() - new Date(job.created_at + 'Z').getTime()) / (1000 * 60 * 60 * 24));
-                    const daysLabel = appliedDays <= 0 ? 'Applied today' : `Applied ${appliedDays}d ago`;
+                    const daysLabel = appliedDays <= 0 ? 'Added today' : `Added ${appliedDays}d ago`;
                     const hasExtraDetails = Boolean(job.notes || job.salary_asked || job.interview_date);
 
                     pipelineHtml = `
-                        <div class="mt-4 pt-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div class="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-xs font-semibold text-gray-500">Pipeline:</span>
-                                <select onchange="updatePipelineStage(${job.id}, this.value)" class="text-xs font-semibold px-2.5 py-1 rounded-full border ${stageClass} cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                <span class="text-xs font-bold text-slate-500">Stage:</span>
+                                <select onchange="updatePipelineStage(${job.id}, this.value)" class="text-xs font-bold px-3 py-1 rounded-full border ${stageClass} cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs">
+                                    <option value="To Apply" ${stage === 'To Apply' ? 'selected' : ''}>📝 To Apply</option>
                                     <option value="Applied" ${stage === 'Applied' ? 'selected' : ''}>🟣 Applied</option>
                                     <option value="Recruiter Screen" ${stage === 'Recruiter Screen' ? 'selected' : ''}>🔵 Recruiter Screen</option>
                                     <option value="Tech Interview" ${stage === 'Tech Interview' ? 'selected' : ''}>🟡 Tech Interview</option>
                                     <option value="Offer" ${stage === 'Offer' ? 'selected' : ''}>🟢 Offer</option>
                                     <option value="Rejected" ${stage === 'Rejected' ? 'selected' : ''}>🔴 Rejected</option>
                                 </select>
-                                <span class="text-[11px] text-gray-400 ml-1"><i class="far fa-clock mr-1"></i>${daysLabel}</span>
-                                ${job.salary_asked ? `<span class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i class="fas fa-hand-holding-usd mr-1"></i>Asked: ${job.salary_asked}</span>` : ''}
-                                ${job.interview_date ? `<span class="text-[11px] font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100"><i class="far fa-calendar-check mr-1"></i>${job.interview_date.replace('T', ' ')}</span>` : ''}
+                                <span class="text-[11px] text-slate-400 font-medium ml-1"><i class="far fa-clock mr-1"></i>${daysLabel}</span>
+                                ${job.salary_asked ? `<span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200/60 shadow-2xs"><i class="fas fa-hand-holding-usd mr-1 text-emerald-500"></i>Asked: ${job.salary_asked}</span>` : ''}
+                                ${job.interview_date ? `<span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-200/60 shadow-2xs"><i class="far fa-calendar-check mr-1 text-indigo-500"></i>${job.interview_date.replace('T', ' ')}</span>` : ''}
                             </div>
-                            <button onclick="togglePipelineDrawer(${job.id})" class="text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1.5 font-medium">
-                                <i class="fas fa-edit"></i>
+                            <button onclick="togglePipelineDrawer(${job.id})" class="text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 font-bold cursor-pointer">
+                                <i class="fas fa-edit text-[11px]"></i>
                                 <span>${hasExtraDetails ? 'Edit Notes & Details' : '+ Add Notes & Details'}</span>
                             </button>
                         </div>
-                        <div id="pipeline-drawer-${job.id}" class="hidden mt-3 p-3.5 bg-gray-50 rounded-xl border border-gray-200/80 space-y-3 text-xs">
+                        <div id="pipeline-drawer-${job.id}" class="hidden mt-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3 text-xs">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                     <label class="block font-medium text-gray-600 mb-1">Expected / Asked Salary:</label>
-                                    <input type="text" id="salary-input-${job.id}" value="${job.salary_asked || ''}" placeholder="e.g. 15 000 B2B or 12 000 UoP" class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+                                     <label class="block font-bold text-slate-600 mb-1">Expected / Asked Salary:</label>
+                                    <input type="text" id="salary-input-${job.id}" value="${job.salary_asked || ''}" placeholder="e.g. 15 000 B2B or 12 000 UoP" class="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
                                 </div>
                                 <div>
-                                    <label class="block font-medium text-gray-600 mb-1">Next Interview / Call (Date & Time):</label>
-                                    <input type="datetime-local" id="date-input-${job.id}" value="${job.interview_date || ''}" class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+                                    <label class="block font-bold text-slate-600 mb-1">Next Interview / Call (Date & Time):</label>
+                                    <input type="datetime-local" id="date-input-${job.id}" value="${job.interview_date || ''}" class="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs" />
                                 </div>
                             </div>
                             <div>
-                                <label class="block font-medium text-gray-600 mb-1">Recruiter Notes / Technical Tasks:</label>
-                                <textarea id="notes-input-${job.id}" rows="2" placeholder="e.g. Spoke with Kasia on LinkedIn. Technical test task due Friday. Mentioned API testing..." class="w-full bg-white border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-blue-500 focus:outline-none">${job.notes || ''}</textarea>
+                                <label class="block font-bold text-slate-600 mb-1">Recruiter Notes / Technical Tasks:</label>
+                                <textarea id="notes-input-${job.id}" rows="2" placeholder="e.g. Spoke with Kasia on LinkedIn. Technical test task due Friday..." class="w-full bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-2xs">${job.notes || ''}</textarea>
                             </div>
                             <div class="flex justify-between items-center pt-1">
-                                <span id="save-status-${job.id}" class="text-[11px] text-green-600 font-medium hidden"><i class="fas fa-check mr-1"></i>Saved!</span>
+                                <span id="save-status-${job.id}" class="text-[11px] text-emerald-600 font-bold hidden"><i class="fas fa-check mr-1"></i>Saved!</span>
                                 <div class="flex gap-2 ml-auto">
-                                    <button onclick="savePipelineDetails(${job.id})" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95">Save Details</button>
-                                    <button onclick="togglePipelineDrawer(${job.id})" class="text-gray-500 hover:text-gray-700 px-2.5 py-1.5 text-xs">Close</button>
+                                    <button onclick="savePipelineDetails(${job.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer">Save Details</button>
+                                    <button onclick="togglePipelineDrawer(${job.id})" class="text-slate-500 hover:text-slate-700 px-2.5 py-1.5 text-xs font-semibold cursor-pointer">Close</button>
                                 </div>
                             </div>
                         </div>
                     `;
                 }
 
+                const portalBadgeClass = PORTAL_COLORS[job.source] || 'bg-slate-100 text-slate-700 border-slate-200';
+
+                const netInfo = calculateNetTakeHome(job.pay);
+                let netBadgeHtml = '';
+                if (netInfo) {
+                    const formattedNet = netInfo.net_monthly.toLocaleString('pl-PL').replace(/\s/g, ' ');
+                    netBadgeHtml = `
+                        <span class="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-200/90 shadow-2xs flex items-center gap-1.5" title="Estimated monthly take-home pay: ~${formattedNet} zł na rękę / month (${netInfo.contract_type === 'B2B' ? 'B2B Ryczałt 8.5% po ZUS i podatku' : 'UoP po ZUS i PIT'})">
+                            <i class="fas fa-wallet text-teal-600 text-[11px]"></i>
+                            <span>~${formattedNet} zł <span class="text-[10px] font-semibold text-teal-700/80 uppercase">(${netInfo.contract_type} netto)</span></span>
+                        </span>
+                    `;
+                }
+
                 card.innerHTML = `
                     <div class="flex justify-between items-start w-full">
-                        <div class="flex-1 min-w-0 pr-6">
-                            <div class="flex items-center gap-2.5 flex-wrap mb-1.5">
+                        <div class="flex-1 min-w-0 pr-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-1.5">
                                 ${statusChipHtml}
-                                <a href="${job.url}" target="_blank" class="text-lg font-semibold text-gray-900 hover:text-blue-600 truncate transition-colors">
+                                ${manualBadgeHtml}
+                                <a href="${job.url}" target="_blank" class="text-base sm:text-lg font-bold text-slate-900 hover:text-indigo-600 truncate transition-colors">
                                     ${job.title}
                                 </a>
                                 ${job.company ? `
-                                    <button onclick="filterByCompany('${job.company.replace(/'/g, "\\'")}')" class="text-xs font-semibold text-gray-800 bg-gray-100 hover:bg-gray-200 hover:text-blue-600 px-2.5 py-0.5 rounded-md border border-gray-200/80 flex items-center gap-1.5 transition-colors cursor-pointer" title="Click to filter by ${job.company}">
-                                        <i class="fas fa-building text-gray-400 text-[10px]"></i>
+                                    <button onclick="filterByCompany('${job.company.replace(/'/g, "\'")}')" class="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 hover:text-indigo-600 px-2.5 py-0.5 rounded-md border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs" title="Click to filter by ${job.company}">
+                                        <i class="fas fa-building text-slate-400 text-[10px]"></i>
                                         <span>${job.company}</span>
                                     </button>
                                 ` : ''}
                             </div>
-                            <div class="flex items-center gap-2.5 flex-wrap">
-                                <span class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">${job.source}</span>
-                                ${job.city ? `<span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100"><i class="fas fa-map-marker-alt mr-1"></i>${job.city}</span>` : ''}
-                                ${job.pay && job.pay !== 'Not given' ? `<span class="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-100"><i class="fas fa-coins mr-1"></i>${job.pay}</span>` : `<span class="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200"><i class="fas fa-coins mr-1"></i>Not given</span>`}
-                                ${job.published_at ? `<span class="text-xs font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100"><i class="far fa-calendar-alt mr-1"></i>${job.published_at}</span>` : `<span class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i>${dateString}</span>`}
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded-md border ${portalBadgeClass} shadow-2xs">${job.source}</span>
+                                ${job.city ? `<span class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200/60 shadow-2xs"><i class="fas fa-map-marker-alt mr-1 text-blue-500"></i>${job.city}</span>` : ''}
+                                ${getContractTypeBadge(job)}
+                                ${job.pay && job.pay !== 'Not given' ? `<span class="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200/80 shadow-2xs"><i class="fas fa-coins mr-1 text-emerald-600"></i>${job.pay}</span>` : `<span class="text-xs font-medium text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60"><i class="fas fa-coins mr-1 text-slate-300"></i>Not given</span>`}
+                                ${netBadgeHtml}
+                                ${job.published_at ? `<span class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-200/60"><i class="far fa-calendar-alt mr-1"></i>${job.published_at}</span>` : `<span class="text-xs text-slate-400 font-medium"><i class="far fa-clock mr-1"></i>${dateString}</span>`}
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 flex-shrink-0">
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
                             ${actionsHtml}
                         </div>
                     </div>
@@ -489,19 +1194,238 @@
             });
         }
 
-        async function updateStatus(jobId, newStatus) {
-            try {
-                await fetch(`/api/jobs/${jobId}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
+        // ==========================================
+        // RENDER: Full-Width 6-Column Jira Swimlanes
+        // ==========================================
+        function renderKanbanBoard(jobs, isFiltered = false) {
+            const grouped = {};
+            STAGES.forEach(s => grouped[s] = []);
+
+            jobs.forEach(job => {
+                const st = (job.stage && STAGES.includes(job.stage)) ? job.stage : (job.status === 'APPLIED' ? 'Applied' : 'To Apply');
+                grouped[st].push(job);
+            });
+
+            STAGES.forEach(stage => {
+                const colContainer = document.getElementById(`cards-col-${stage}`);
+                const countBadge = document.getElementById(`count-col-${stage}`);
+                if (!colContainer) return;
+
+                const stageJobs = grouped[stage] || [];
+                if (countBadge) countBadge.innerText = stageJobs.length;
+
+                colContainer.innerHTML = '';
+
+                if (stageJobs.length === 0) {
+                    colContainer.innerHTML = `
+                        <div class="h-32 border-2 border-dashed border-slate-200/80 rounded-2xl flex flex-col items-center justify-center text-slate-400 text-xs font-semibold select-none gap-1 bg-white/40">
+                            <i class="fas fa-inbox text-base text-slate-300"></i>
+                            <span>Drop offers here</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                stageJobs.forEach(job => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-3 rounded-2xl shadow-xs border border-slate-200/90 hover:shadow-md hover:border-indigo-300 transition-all cursor-grab active:cursor-grabbing text-xs space-y-2 group';
+                    card.draggable = true;
+                    card.ondragstart = (e) => onDragStart(e, job.id);
+
+                    const stageIdx = STAGES.indexOf(stage);
+                    const canMoveLeft = stageIdx > 0;
+                    const canMoveRight = stageIdx < STAGES.length - 1;
+                    const leftStage = canMoveLeft ? STAGES[stageIdx - 1] : null;
+                    const rightStage = canMoveRight ? STAGES[stageIdx + 1] : null;
+
+                    const portalBadgeClass = PORTAL_COLORS[job.source] || 'bg-slate-100 text-slate-700 border-slate-200';
+
+                    const isRejected = (stage === 'Rejected');
+                    card.innerHTML = `
+                        <div class="flex items-start justify-between gap-1.5">
+                            <a href="${job.url}" target="_blank" class="font-extrabold text-slate-900 hover:text-indigo-600 line-clamp-2 leading-snug transition-colors" title="${job.title}">
+                                ${job.title}
+                            </a>
+                            <div class="flex items-center gap-1 flex-shrink-0">
+                                ${!isRejected ? `
+                                    <button onclick="updatePipelineStage(${job.id}, 'Rejected')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 w-6 h-6 flex items-center justify-center rounded-lg transition-all border border-slate-100 hover:border-rose-200 shadow-2xs cursor-pointer" title="Reject (Move to Rejected column)">
+                                        <i class="fas fa-times text-[11px]"></i>
+                                    </button>
+                                ` : ''}
+                                <button onclick="openJobDetailsModal(${job.id})" class="text-slate-400 hover:text-slate-800 hover:bg-slate-100 w-6 h-6 flex items-center justify-center rounded-lg transition-colors" title="Edit Details">
+                                    <i class="fas fa-ellipsis-v text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            ${job.company ? `<span class="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-[10px] truncate max-w-[130px] shadow-2xs border border-slate-200/60"><i class="fas fa-building text-slate-400 mr-1"></i>${job.company}</span>` : ''}
+                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${portalBadgeClass}">${job.source}</span>
+                            ${job.city ? `<span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200/60"><i class="fas fa-map-marker-alt mr-0.5 text-blue-500"></i>${job.city}</span>` : ''}
+                            ${getContractTypeBadge(job, true)}
+                        </div>
+
+                        <div class="space-y-1 text-[11px]">
+                            ${job.pay && job.pay !== 'Not given' ? `
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70 shadow-2xs text-[10px]"><i class="fas fa-coins mr-1 text-emerald-600"></i>${job.pay}</span>
+                                    ${(() => {
+                                        const net = calculateNetTakeHome(job.pay);
+                                        if (!net) return '';
+                                        const fmt = net.net_monthly.toLocaleString('pl-PL').replace(/\s/g, ' ');
+                                        return `<span class="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/70 shadow-2xs text-[10px]" title="Estimated net take-home"><i class="fas fa-wallet mr-1 text-teal-600"></i>~${fmt} zł (${net.contract_type})</span>`;
+                                    })()}
+                                </div>
+                            ` : ''}
+                            ${job.salary_asked ? `<div class="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200/60"><i class="fas fa-hand-holding-usd mr-1 text-purple-500"></i>Asked: ${job.salary_asked}</div>` : ''}
+                            ${job.interview_date ? `<div class="font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/60"><i class="far fa-calendar-check mr-1 text-indigo-500"></i>${job.interview_date.replace('T', ' ')}</div>` : ''}
+                            ${job.notes ? `<div class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200/60 line-clamp-2 italic"><i class="far fa-comment-dots text-slate-400 mr-1"></i>${job.notes}</div>` : ''}
+                        </div>
+
+                        <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                            <div class="flex items-center gap-1">
+                                ${canMoveLeft ? `
+                                    <button onclick="updatePipelineStage(${job.id}, '${leftStage}')" class="text-slate-400 hover:text-slate-900 hover:bg-slate-100 px-1.5 py-0.5 rounded-md transition-colors" title="Move to ${leftStage}">
+                                        <i class="fas fa-arrow-left"></i>
+                                    </button>
+                                ` : '<span class="w-4"></span>'}
+                                ${canMoveRight ? `
+                                    <button onclick="updatePipelineStage(${job.id}, '${rightStage}')" class="text-slate-400 hover:text-slate-900 hover:bg-slate-100 px-1.5 py-0.5 rounded-md transition-colors" title="Move to ${rightStage}">
+                                        <i class="fas fa-arrow-right"></i>
+                                    </button>
+                                ` : '<span class="w-4"></span>'}
+                            </div>
+                            <button onclick="openJobDetailsModal(${job.id})" class="text-indigo-600 hover:text-indigo-800 font-bold hover:underline">
+                                Edit Notes
+                            </button>
+                        </div>
+                    `;
+
+                    colContainer.appendChild(card);
                 });
-                fetchJobs(); 
-            } catch (e) {
-                alert("Failed to update status.");
+            });
+        }
+
+        // ==========================================
+        // DRAG & DROP HANDLERS (KANBAN)
+        // ==========================================
+        let draggedJobId = null;
+
+        function onDragStart(event, jobId) {
+            draggedJobId = jobId;
+            event.dataTransfer.setData('text/plain', jobId);
+            event.dataTransfer.effectAllowed = 'move';
+            if (event.currentTarget) event.currentTarget.classList.add('dragging');
+        }
+
+        function onDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            const col = event.currentTarget;
+            if (col && !col.classList.contains('drag-over-active')) {
+                col.classList.add('drag-over-active');
             }
         }
 
+        function onDragLeave(event) {
+            const col = event.currentTarget;
+            if (col) {
+                col.classList.remove('drag-over-active');
+            }
+        }
+
+        async function onDrop(event, targetStage) {
+            event.preventDefault();
+            const col = event.currentTarget;
+            if (col) {
+                col.classList.remove('drag-over-active');
+            }
+            
+            const jobId = event.dataTransfer.getData('text/plain') || draggedJobId;
+            if (!jobId || !targetStage) return;
+
+            const job = allCurrentJobs.find(j => j.id == jobId);
+            if (job) {
+                job.stage = targetStage;
+                applyFilters();
+            }
+
+            await updatePipelineStage(jobId, targetStage, false);
+        }
+
+        // ==========================================
+        // JOB DETAILS MODAL LOGIC
+        // ==========================================
+        function openJobDetailsModal(jobId) {
+            const job = allCurrentJobs.find(j => j.id == jobId);
+            if (!job) return;
+
+            document.getElementById('modalJobId').value = job.id;
+            document.getElementById('modalJobTitle').innerText = job.title;
+            document.getElementById('modalJobCompany').innerText = job.company ? `${job.company} • ${job.source}` : job.source;
+            document.getElementById('modalJobStage').value = job.stage || 'Applied';
+            document.getElementById('modalJobSalary').value = job.salary_asked || '';
+            document.getElementById('modalJobDate').value = job.interview_date || '';
+            document.getElementById('modalJobNotes').value = job.notes || '';
+
+            document.getElementById('jobDetailsModal').classList.remove('hidden');
+        }
+
+        function closeJobDetailsModal() {
+            document.getElementById('jobDetailsModal').classList.add('hidden');
+        }
+
+        async function saveJobDetailsFromModal(event) {
+            event.preventDefault();
+            const jobId = document.getElementById('modalJobId').value;
+            const stage = document.getElementById('modalJobStage').value;
+            const salary = document.getElementById('modalJobSalary').value.trim();
+            const date = document.getElementById('modalJobDate').value;
+            const notes = document.getElementById('modalJobNotes').value.trim();
+
+            const btn = document.getElementById('modalSaveBtn');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...`;
+
+            try {
+                await fetch(`/api/jobs/${jobId}/pipeline`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        stage: stage,
+                        salary_asked: salary,
+                        interview_date: date,
+                        notes: notes
+                    })
+                });
+
+                const job = allCurrentJobs.find(j => j.id == jobId);
+                if (job) {
+                    job.stage = stage;
+                    job.salary_asked = salary;
+                    job.interview_date = date;
+                    job.notes = notes;
+                }
+
+                closeJobDetailsModal();
+                applyFilters();
+            } catch (e) {
+                alert("Failed to save details: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-check mr-1"></i> Save`;
+            }
+        }
+
+        async function moveJobFromModal(newStatus) {
+            const jobId = document.getElementById('modalJobId').value;
+            closeJobDetailsModal();
+            await updateStatus(jobId, newStatus);
+        }
+
+        // ==========================================
+        // PIPELINE IN-CARD UPDATES
+        // ==========================================
         function togglePipelineDrawer(jobId) {
             const drawer = document.getElementById(`pipeline-drawer-${jobId}`);
             if (drawer) {
@@ -509,14 +1433,24 @@
             }
         }
 
-        async function updatePipelineStage(jobId, newStage) {
+        async function updatePipelineStage(jobId, newStage, refetch = true) {
             try {
+                const job = allCurrentJobs.find(j => j.id == jobId);
+                if (job) {
+                    job.stage = newStage;
+                    job.is_manual = 0;
+                }
                 await fetch(`/api/jobs/${jobId}/pipeline`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ stage: newStage })
                 });
-                fetchJobs();
+                
+                if (refetch) {
+                    fetchJobs();
+                } else {
+                    applyFilters();
+                }
             } catch (e) {
                 alert("Failed to update pipeline stage: " + e.message);
             }
@@ -544,9 +1478,192 @@
                         if (statusEl) statusEl.classList.add('hidden');
                     }, 2000);
                 }
+                const job = allCurrentJobs.find(j => j.id == jobId);
+                if (job) {
+                    job.salary_asked = salary;
+                    job.interview_date = date;
+                    job.notes = notes;
+                }
                 fetchJobs();
             } catch (e) {
                 alert("Failed to save pipeline details: " + e.message);
+            }
+        }
+
+        async function updateStatus(jobId, newStatus) {
+            const statusPayload = (newStatus === 'ACCEPTED') ? 'APPLIED' : newStatus;
+            try {
+                const job = allCurrentJobs.find(j => j.id == jobId);
+                if (job) {
+                    job.status = statusPayload;
+                    job.is_manual = 0; // Clear highlight once moved out of NEW
+                }
+                await fetch(`/api/jobs/${jobId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: statusPayload })
+                });
+                fetchJobs(); 
+            } catch (e) {
+                alert("Failed to update status.");
+            }
+        }
+
+        // ==========================================
+        // ADD JOB MANUALLY BY URL LOGIC
+        // ==========================================
+        let urlDebounceTimer = null;
+
+        function openAddJobModal() {
+            document.getElementById('addJobForm').reset();
+            document.getElementById('addJobPreviewStatus').classList.add('hidden');
+            document.getElementById('addJobModal').classList.remove('hidden');
+            setTimeout(() => {
+                const inp = document.getElementById('addJobUrl');
+                if (inp) inp.focus();
+            }, 60);
+        }
+
+        function closeAddJobModal() {
+            document.getElementById('addJobModal').classList.add('hidden');
+        }
+
+        let pendingJobPayload = null;
+
+        function closeDuplicateModal() {
+            const modal = document.getElementById('duplicateJobModal');
+            if (modal) modal.classList.add('hidden');
+            pendingJobPayload = null;
+        }
+
+        async function confirmOverrideDuplicate() {
+            if (!pendingJobPayload) return;
+            const payload = { ...pendingJobPayload, override: true };
+            closeDuplicateModal();
+            await executeAddJob(payload);
+        }
+
+        function onAddJobUrlChange() {
+            const url = (document.getElementById('addJobUrl')?.value || '').trim();
+            if (url.length > 10 && (url.startsWith('http://') || url.startsWith('https://') || url.includes('.'))) {
+                if (urlDebounceTimer) clearTimeout(urlDebounceTimer);
+                urlDebounceTimer = setTimeout(() => {
+                    autoDetectMetadataFromUrl(true);
+                }, 700);
+            }
+        }
+
+        async function autoDetectMetadataFromUrl(silent = false) {
+            const urlInp = document.getElementById('addJobUrl');
+            const url = urlInp ? urlInp.value.trim() : '';
+            if (!url) {
+                if (!silent) alert("Please enter a URL first.");
+                return;
+            }
+
+            const statusEl = document.getElementById('addJobPreviewStatus');
+            const fetchBtn = document.getElementById('autoFetchBtn');
+            if (statusEl) statusEl.classList.remove('hidden');
+            if (fetchBtn) fetchBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/jobs/preview-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.title) {
+                        document.getElementById('addJobTitle').value = data.title;
+                    }
+                    if (data.company) {
+                        document.getElementById('addJobCompany').value = data.company;
+                    }
+                    if (data.source) {
+                        document.getElementById('addJobSource').value = data.source;
+                    }
+                    if (data.city) {
+                        document.getElementById('addJobCity').value = data.city;
+                    }
+                    if (data.pay && data.pay !== 'Not given') {
+                        document.getElementById('addJobPay').value = data.pay;
+                    }
+                    if (data.contract_type) {
+                        document.getElementById('addJobContractType').value = data.contract_type;
+                    }
+                }
+            } catch(e) {
+                console.warn("Auto-detect failed:", e);
+            } finally {
+                if (statusEl) statusEl.classList.add('hidden');
+                if (fetchBtn) fetchBtn.disabled = false;
+            }
+        }
+
+        async function submitAddJobForm(event) {
+            if (event) event.preventDefault();
+            const url = document.getElementById('addJobUrl').value.trim();
+            const title = document.getElementById('addJobTitle').value.trim();
+            const company = document.getElementById('addJobCompany').value.trim();
+            const source = document.getElementById('addJobSource').value.trim();
+            const city = document.getElementById('addJobCity').value.trim();
+            const pay = document.getElementById('addJobPay').value.trim();
+            const contractType = document.getElementById('addJobContractType').value.trim();
+
+            const payload = {
+                url: url,
+                title: title,
+                company: company,
+                source: source,
+                city: city,
+                pay: pay,
+                contract_type: contractType,
+                override: false
+            };
+
+            await executeAddJob(payload);
+        }
+
+        async function executeAddJob(payload) {
+            const submitBtn = document.getElementById('addJobSubmitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<i class="fas fa-circle-notch fa-spin mr-1"></i> Adding...`;
+            }
+
+            try {
+                const res = await fetch('/api/jobs/manual', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.already_exists && !payload.override) {
+                    pendingJobPayload = payload;
+                    document.getElementById('duplicateOfferTitle').innerText = data.title || payload.title || payload.url;
+                    document.getElementById('duplicateOfferCompany').innerText = data.company ? `${data.company} • ${payload.source || 'Manual'}` : (payload.source || 'Manual');
+                    document.getElementById('duplicateOfferStatus').innerText = data.status || 'SAVED';
+                    document.getElementById('duplicateOfferStage').innerText = data.stage || 'To Apply';
+                    document.getElementById('duplicateJobModal').classList.remove('hidden');
+                    return;
+                }
+                
+                closeAddJobModal();
+                closeDuplicateModal();
+                showRefreshToast(data.message || "Offer added to NEW queue!");
+
+                // Clear active search or filters so the newly added offer is immediately displayed
+                clearAllFilters();
+                switchTab('NEW');
+            } catch (e) {
+                alert("Failed to add job: " + e.message);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fas fa-plus"></i> <span>Add to NEW</span>`;
+                }
             }
         }
 
@@ -572,23 +1689,119 @@
             }
         }
 
+        let scraperPollInterval = null;
+
+        async function pollScraperStatus() {
+            try {
+                const res = await fetch('/api/scraper/status');
+                if (!res.ok) return;
+                const state = await res.json();
+                
+                const scannedEl = document.getElementById('liveCounterScanned');
+                const passedEl = document.getElementById('liveCounterPassed');
+                const autoEl = document.getElementById('liveCounterAuto');
+                const otherEl = document.getElementById('liveCounterOther');
+                const portalEl = document.getElementById('liveCurrentPortal');
+                const jobEl = document.getElementById('liveCurrentJob');
+                const statusEl = document.getElementById('liveCurrentStatus');
+                
+                if (scannedEl && state.scanned !== undefined) scannedEl.innerText = state.scanned;
+                if (passedEl && state.passed !== undefined) passedEl.innerText = state.passed;
+                if (autoEl && state.automation_rejected !== undefined) autoEl.innerText = state.automation_rejected;
+                if (otherEl && (state.other_rejected !== undefined || state.duplicates !== undefined)) {
+                    otherEl.innerText = (state.other_rejected || 0) + (state.duplicates || 0);
+                }
+                
+                if (portalEl && state.current_portal) portalEl.innerText = state.current_portal;
+                if (jobEl && state.current_job) jobEl.innerText = state.current_job;
+                if (statusEl && state.current_status) statusEl.innerText = state.current_status;
+            } catch(e) {
+                // Ignore transient network errors during rapid polling
+            }
+        }
+
+        function showSummaryBanner(summary, message) {
+            const banner = document.getElementById('scrapeSummaryBanner');
+            const titleEl = document.getElementById('summaryBannerTitle');
+            const chipsEl = document.getElementById('summaryBannerChips');
+            if (!banner || !titleEl || !chipsEl) return;
+            
+            const totalScanned = summary?.total_found ?? 0;
+            const totalRejected = summary?.total_rejected ?? 0;
+            const added = summary?.added ?? 0;
+            const autoRej = summary?.automation_rejected ?? 0;
+            const otherRej = summary?.other_rejected ?? 0;
+            const dupes = summary?.duplicates ?? 0;
+
+            titleEl.innerText = message || `Found ${totalScanned} offers, rejected ${totalRejected} of them, ${added} were added to NEW.`;
+            
+            chipsEl.innerHTML = `
+                <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 font-semibold shadow-2xs">
+                    <i class="fas fa-search text-slate-400 mr-1"></i>Found: <strong class="text-slate-900">${totalScanned}</strong>
+                </span>
+                <span class="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200 font-bold shadow-2xs">
+                    <i class="fas fa-check-circle text-emerald-600 mr-1"></i>Added to NEW: <strong>${added}</strong>
+                </span>
+                <span class="bg-rose-50 text-rose-800 px-2 py-0.5 rounded-md border border-rose-200 font-semibold shadow-2xs">
+                    <i class="fas fa-robot text-rose-500 mr-1"></i>Automation: <strong>${autoRej}</strong>
+                </span>
+                ${otherRej > 0 ? `
+                    <span class="bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200 font-semibold shadow-2xs">
+                        <i class="fas fa-map-marker-alt text-amber-500 mr-1"></i>Other / Loc: <strong>${otherRej}</strong>
+                    </span>
+                ` : ''}
+                ${dupes > 0 ? `
+                    <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 font-semibold shadow-2xs">
+                        <i class="fas fa-clone text-slate-400 mr-1"></i>Duplicates: <strong>${dupes}</strong>
+                    </span>
+                ` : ''}
+            `;
+            
+            banner.classList.remove('hidden');
+        }
+
+        function dismissSummaryBanner() {
+            const banner = document.getElementById('scrapeSummaryBanner');
+            if (banner) {
+                banner.classList.add('hidden');
+            }
+        }
+
         async function refreshJobs(portal, deep = false) {
             disableButtons(true);
             
+            // Hide previous summary banner while scraping
+            dismissSummaryBanner();
+
             const listEl = document.getElementById('jobList');
-            listEl.innerHTML = ''; // Hide list while scraping
+            listEl.innerHTML = '';
             
-            // Setup Progress Bar UI
             const loadingState = document.getElementById('loadingState');
             const progressBar = document.getElementById('progressBar');
             const progressPercent = document.getElementById('progressPercent');
             const progressTitle = document.getElementById('progressTitle');
             const progressTime = document.getElementById('progressTime');
+
+            // Reset live counter badges
+            const scannedEl = document.getElementById('liveCounterScanned');
+            const passedEl = document.getElementById('liveCounterPassed');
+            const autoEl = document.getElementById('liveCounterAuto');
+            const otherEl = document.getElementById('liveCounterOther');
+            const portalEl = document.getElementById('liveCurrentPortal');
+            const jobEl = document.getElementById('liveCurrentJob');
+            const statusEl = document.getElementById('liveCurrentStatus');
+            
+            if (scannedEl) scannedEl.innerText = '0';
+            if (passedEl) passedEl.innerText = '0';
+            if (autoEl) autoEl.innerText = '0';
+            if (otherEl) otherEl.innerText = '0';
+            if (portalEl) portalEl.innerText = portal;
+            if (jobEl) jobEl.innerText = 'Launching browser...';
+            if (statusEl) statusEl.innerText = 'Starting...';
             
             loadingState.classList.remove('hidden');
             loadingState.classList.add('flex');
             
-            // Estimates (Playwright takes time to boot and navigate)
             let estimatedSeconds;
             if (deep) {
                 estimatedSeconds = (portal === 'ALL') ? 600 : 180;
@@ -602,42 +1815,37 @@
                 : `LAUNCHING BROWSER FOR ${portal}`;
             
             let progress = 0;
-            const tickRate = 500; // ms
+            const tickRate = 400;
             const increment = 100 / ((estimatedSeconds * 1000) / tickRate);
             
-            // Fake progression
             progressInterval = setInterval(() => {
-                if (progress < 98) { // Stop at 98% until actually done
-                    progress += (increment * (1 - (progress/100))); // Slows down as it gets closer to 100
+                if (progress < 98) {
+                    progress += (increment * (1 - (progress/100)));
                     progressBar.style.width = `${progress}%`;
                     progressPercent.innerText = `${Math.floor(progress)}%`;
-                    
-                    if (deep) {
-                        if(progress > 5 && progress < 20) progressTitle.innerText = `🔍 SCROLLING DEEP ON JOB BOARDS...`;
-                        if(progress > 20 && progress < 40) progressTitle.innerText = `🔍 COLLECTING ALL JOB URLs...`;
-                        if(progress > 40 && progress < 70) progressTitle.innerText = `🔍 VISITING INDIVIDUAL JOB PAGES...`;
-                        if(progress > 70 && progress < 90) progressTitle.innerText = `🔍 ANALYZING REQUIREMENTS...`;
-                        if(progress > 90) progressTitle.innerText = `🔍 DEDUPLICATING ENTRIES...`;
-                    } else {
-                        if(progress > 20 && progress < 50) progressTitle.innerText = `EXTRACTING JOB LINKS...`;
-                        if(progress > 50 && progress < 80) progressTitle.innerText = `ANALYZING REQUIREMENTS...`;
-                        if(progress > 80) progressTitle.innerText = `DEDUPLICATING ENTRIES...`;
-                    }
                 }
             }, tickRate);
 
+            // Start live status polling
+            pollScraperStatus();
+            scraperPollInterval = setInterval(pollScraperStatus, 350);
+
             let completionMsg = "";
+            let scrapeSummary = null;
             try {
                 const deepParam = deep ? '&deep=true' : '';
                 const resp = await fetch(`/api/refresh?portal=${portal}${deepParam}`, { method: 'POST' });
                 const result = await resp.json();
                 completionMsg = result.message || "";
+                scrapeSummary = result.summary || null;
             } catch(e) {
                 completionMsg = "Scraper error: " + e.message;
             }
             
-            // Finish Progress Bar
             clearInterval(progressInterval);
+            clearInterval(scraperPollInterval);
+            await pollScraperStatus(); // Final update of counters
+
             progressBar.style.width = '100%';
             progressPercent.innerText = `100%`;
             progressTitle.innerText = `COMPLETE!`;
@@ -648,12 +1856,12 @@
                 progressBar.style.width = '0%';
                 
                 disableButtons(false);
-                fetchJobs();
+                switchTab('NEW');
 
-                if (completionMsg) {
-                    showRefreshToast(completionMsg);
+                if (scrapeSummary || completionMsg) {
+                    showSummaryBanner(scrapeSummary, completionMsg);
                 }
-            }, 800);
+            }, 700);
         }
 
         function showRefreshToast(msg) {
@@ -682,18 +1890,36 @@
         function switchTab(tab) {
             currentTab = tab;
             
-            ['ALL', 'NEW', 'APPLIED', 'IGNORED', 'WRONG'].forEach(t => {
+            ['ALL', 'NEW', 'ACCEPTED', 'IGNORED', 'WRONG'].forEach(t => {
                 const el = document.getElementById(`tab-${t}`);
                 if (el) {
                     if (t === tab) {
                         el.classList.add('tab-active');
-                        el.classList.remove('text-gray-400', 'font-normal');
+                        el.classList.remove('text-slate-400', 'font-normal');
                     } else {
                         el.classList.remove('tab-active');
-                        el.classList.add('text-gray-400', 'font-normal');
+                        el.classList.add('text-slate-400', 'font-normal');
                     }
                 }
             });
+
+            const switcher = document.getElementById('viewModeSwitcher');
+            if (tab === 'ACCEPTED') {
+                if (switcher) {
+                    switcher.classList.remove('hidden');
+                    switcher.classList.add('flex');
+                }
+            } else {
+                if (switcher) {
+                    switcher.classList.add('hidden');
+                    switcher.classList.remove('flex');
+                }
+                // Force list view on all non-accepted tabs
+                if (viewMode === 'board') {
+                    setViewMode('list');
+                    return;
+                }
+            }
 
             fetchJobs();
         }
@@ -758,13 +1984,13 @@
                 });
                 const data = await res.json();
                 
-                feedback.className = "text-xs text-center py-2 rounded-lg font-medium bg-green-50 text-green-700 border border-green-200 block";
+                feedback.className = "text-xs text-center py-2 rounded-xl font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 block";
                 feedback.innerText = "Settings saved successfully!";
                 
                 loadSettings();
                 setTimeout(() => { closeSettingsModal(); }, 900);
             } catch (e) {
-                feedback.className = "text-xs text-center py-2 rounded-lg font-medium bg-red-50 text-red-700 border border-red-200 block";
+                feedback.className = "text-xs text-center py-2 rounded-xl font-bold bg-rose-50 text-rose-700 border border-rose-200 block";
                 feedback.innerText = "Failed to save settings.";
             } finally {
                 btn.disabled = false;
@@ -849,8 +2075,8 @@
                 const loc = data.locations;
                 document.getElementById('stat-remote-pct').innerText = `${loc.remote_pct || 0}%`;
                 document.getElementById('stat-tricity-pct').innerText = `${loc.tricity_pct || 0}%`;
-                const topCitiesHtml = (loc.top_cities || []).map(c => `<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-medium">${c[0]}: ${c[1]}</span>`).join(' ');
-                document.getElementById('stat-top-cities').innerHTML = topCitiesHtml || '<span class="text-gray-400 text-xs">None</span>';
+                const topCitiesHtml = (loc.top_cities || []).map(c => `<span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-bold">${c[0]}: ${c[1]}</span>`).join(' ');
+                document.getElementById('stat-top-cities').innerHTML = topCitiesHtml || '<span class="text-slate-400 text-xs">None</span>';
                 
                 // Salary brackets
                 const b = s.brackets || {};
@@ -860,10 +2086,10 @@
                     return `
                         <div class="space-y-1">
                             <div class="flex justify-between text-xs">
-                                <span class="font-medium text-gray-700">${range}</span>
-                                <span class="text-gray-500">${cnt} (${pct}%)</span>
+                                <span class="font-bold text-slate-700">${range}</span>
+                                <span class="text-slate-500 font-semibold">${cnt} (${pct}%)</span>
                             </div>
-                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                                 <div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: ${(cnt / bMax) * 100}%"></div>
                             </div>
                         </div>
@@ -877,7 +2103,7 @@
                 const st = p.status_breakdown || {};
                 document.getElementById('funnel-total').innerText = data.total_jobs || 0;
                 document.getElementById('funnel-new').innerText = st.NEW || 0;
-                document.getElementById('funnel-applied').innerText = st.APPLIED || 0;
+                document.getElementById('funnel-applied').innerText = (st.APPLIED || 0) + (st.ACCEPTED || 0);
                 document.getElementById('funnel-screen').innerText = f['Recruiter Screen'] || 0;
                 document.getElementById('funnel-tech').innerText = f['Tech Interview'] || 0;
                 document.getElementById('funnel-offer').innerText = f['Offer'] || 0;
@@ -889,9 +2115,9 @@
                     .map(([portal, count]) => {
                         const pct = Math.round((count / (data.total_jobs || 1)) * 100);
                         return `
-                            <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100 text-xs">
-                                <span class="font-semibold text-gray-800">${portal}</span>
-                                <span class="text-gray-500 font-medium">${count} <span class="text-gray-400 text-[10px]">(${pct}%)</span></span>
+                            <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-100 text-xs shadow-2xs">
+                                <span class="font-bold text-slate-800">${portal}</span>
+                                <span class="text-slate-500 font-semibold">${count} <span class="text-slate-400 text-[10px]">(${pct}%)</span></span>
                             </div>
                         `;
                     }).join('');
@@ -900,9 +2126,9 @@
                 // In-Demand Skills
                 const skillsHtml = (data.skills || []).map(([skill, count]) => {
                     return `
-                        <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100 text-xs">
-                            <span class="font-medium text-gray-700">${skill}</span>
-                            <span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px]">${count} offers</span>
+                        <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-100 text-xs shadow-2xs">
+                            <span class="font-bold text-slate-700">${skill}</span>
+                            <span class="font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md text-[11px] border border-indigo-100">${count} offers</span>
                         </div>
                     `;
                 }).join('');
@@ -911,7 +2137,7 @@
                 document.getElementById('insightsLoading').classList.add('hidden');
                 document.getElementById('insightsContent').classList.remove('hidden');
             } catch (e) {
-                document.getElementById('insightsLoading').innerHTML = '<div class="text-red-500 text-center py-6">Failed to load market insights.</div>';
+                document.getElementById('insightsLoading').innerHTML = '<div class="text-rose-500 text-center py-6 font-bold">Failed to load market insights.</div>';
             }
         }
 
@@ -921,41 +2147,38 @@
     </script>
 
     <!-- Settings & Alerts Modal -->
-    <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center text-sm shadow-sm">
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="px-6 py-4.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-sm shadow-xs">
                         <i class="fas fa-bolt"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-gray-900 text-base">Alerts & Auto-Scan</h3>
-                        <p class="text-xs text-gray-500">100% Free Instant Notifications & Background Scraping</p>
+                        <h3 class="font-extrabold text-slate-900 text-base">Alerts & Auto-Scan</h3>
+                        <p class="text-xs text-slate-500 font-medium">100% Free Instant Notifications & Background Scraping</p>
                     </div>
                 </div>
-                <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <!-- Modal Body -->
             <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-                <!-- Section 1: Background Automation -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200/70 space-y-3">
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 space-y-3">
                     <div class="flex items-center justify-between">
                         <div>
-                            <span class="font-semibold text-gray-900 text-sm block">Automatic Background Scan</span>
-                            <span class="text-xs text-gray-500">Scrapes portals quietly in the background</span>
+                            <span class="font-bold text-slate-900 text-sm block">Automatic Background Scan</span>
+                            <span class="text-xs text-slate-500 font-medium">Scrapes portals quietly in the background</span>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="setting-auto-scan" class="sr-only peer">
-                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                         </label>
                     </div>
-                    <div class="pt-2 border-t border-gray-200 flex items-center justify-between text-xs">
-                        <span class="text-gray-600 font-medium">Scan Frequency:</span>
-                        <select id="setting-interval" class="bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none focus:ring-1 focus:ring-black">
+                    <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                        <span class="text-slate-600 font-bold">Scan Frequency:</span>
+                        <select id="setting-interval" class="bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs">
                             <option value="30">Every 30 Minutes</option>
                             <option value="60">Every 1 Hour (Recommended)</option>
                             <option value="120">Every 2 Hours</option>
@@ -964,72 +2187,68 @@
                     </div>
                 </div>
 
-                <!-- Section 2: Windows Desktop Notification -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200/70 space-y-3">
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 space-y-3">
                     <div class="flex items-center justify-between">
                         <div>
-                            <span class="font-semibold text-gray-900 text-sm block">Windows Desktop Toast</span>
-                            <span class="text-xs text-gray-500">Pops up native Windows 10/11 banner alert</span>
+                            <span class="font-bold text-slate-900 text-sm block">Windows Desktop Toast</span>
+                            <span class="text-xs text-slate-500 font-medium">Pops up native Windows 10/11 banner alert</span>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="setting-desktop-notif" class="sr-only peer">
-                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
                     </div>
-                    <div class="pt-2 border-t border-gray-200 flex justify-end">
-                        <button onclick="testDesktopNotification()" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                    <div class="pt-2 border-t border-slate-200/80 flex justify-end">
+                        <button onclick="testDesktopNotification()" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs">
                             <i class="fas fa-desktop text-blue-500"></i> Test Desktop Alert
                         </button>
                     </div>
                 </div>
 
-                <!-- Section 3: Telegram Mobile Notifications -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200/70 space-y-3">
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 space-y-3">
                     <div class="flex items-center justify-between">
                         <div>
-                            <span class="font-semibold text-gray-900 text-sm block">Telegram Push Notifications</span>
-                            <span class="text-xs text-gray-500">Get alerts straight to your phone (100% Free)</span>
+                            <span class="font-bold text-slate-900 text-sm block">Telegram Push Notifications</span>
+                            <span class="text-xs text-slate-500 font-medium">Get alerts straight to your phone (100% Free)</span>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="setting-tg-notif" class="sr-only peer">
-                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
                         </label>
                     </div>
 
-                    <!-- Setup hint -->
-                    <div class="bg-white p-3 rounded-lg border border-gray-200 text-[11px] text-gray-600 space-y-1">
-                        <div class="font-semibold text-gray-800 flex items-center gap-1">
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                        <div class="font-bold text-slate-800 flex items-center gap-1">
                             <i class="fab fa-telegram text-sky-500 text-sm"></i> 30-Second Setup Guide:
                         </div>
-                        <div>1. In Telegram, message <a href="https://t.me/BotFather" target="_blank" class="text-blue-600 underline font-mono">@BotFather</a> ➔ type <b>/newbot</b> to get your <b>Bot Token</b>.</div>
-                        <div>2. Message <a href="https://t.me/userinfobot" target="_blank" class="text-blue-600 underline font-mono">@userinfobot</a> to get your numeric <b>Chat ID</b>.</div>
+                        <div>1. In Telegram, message <a href="https://t.me/BotFather" target="_blank" class="text-indigo-600 font-bold underline font-mono">@BotFather</a> ➔ type <b>/newbot</b> to get your <b>Bot Token</b>.</div>
+                        <div>2. Message <a href="https://t.me/userinfobot" target="_blank" class="text-indigo-600 font-bold underline font-mono">@userinfobot</a> to get your numeric <b>Chat ID</b>.</div>
                     </div>
 
                     <div class="space-y-2 text-xs">
                         <div>
-                            <label class="font-medium text-gray-700 block mb-1">Bot Token:</label>
-                            <input type="password" id="setting-tg-token" placeholder="123456789:ABCdefGhIjkLmNoPq..." class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-black">
+                            <label class="font-bold text-slate-700 block mb-1">Bot Token:</label>
+                            <input type="password" id="setting-tg-token" placeholder="123456789:ABCdefGhIjkLmNoPq..." class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs">
                         </div>
                         <div>
-                            <label class="font-medium text-gray-700 block mb-1">Your Chat ID:</label>
-                            <input type="text" id="setting-tg-chat-id" placeholder="987654321" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-black">
+                            <label class="font-bold text-slate-700 block mb-1">Your Chat ID:</label>
+                            <input type="text" id="setting-tg-chat-id" placeholder="987654321" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs">
                         </div>
                     </div>
 
-                    <div class="pt-2 border-t border-gray-200 flex justify-end">
-                        <button onclick="testTelegramNotification()" id="testTgBtn" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                    <div class="pt-2 border-t border-slate-200/80 flex justify-end">
+                        <button onclick="testTelegramNotification()" id="testTgBtn" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs">
                             <i class="fab fa-telegram text-sky-500"></i> Send Test Telegram Alert
                         </button>
                     </div>
                 </div>
 
-                <div id="settingsFeedback" class="hidden text-xs text-center py-1.5 rounded-lg font-medium"></div>
+                <div id="settingsFeedback" class="hidden text-xs text-center py-1.5 rounded-xl font-bold"></div>
             </div>
 
-            <!-- Modal Footer -->
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-                <button onclick="closeSettingsModal()" class="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors">Cancel</button>
-                <button onclick="saveSettings()" id="saveSettingsBtn" class="bg-black hover:bg-gray-800 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-2">
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button onclick="closeSettingsModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors">Cancel</button>
+                <button onclick="saveSettings()" id="saveSettingsBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-2">
                     <i class="fas fa-check"></i> Save Settings
                 </button>
             </div>
@@ -1037,143 +2256,135 @@
     </div>
 
     <!-- Market & Salary Insights Modal -->
-    <div id="insightsModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50/40">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm">
+    <div id="insightsModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="px-6 py-4.5 border-b border-slate-100 flex justify-between items-center bg-indigo-50/40">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-xs">
                         <i class="fas fa-chart-pie"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-gray-900 text-base">Market & Salary Insights</h3>
-                        <p class="text-xs text-gray-500">Live intelligence computed from your tracked QA jobs</p>
+                        <h3 class="font-extrabold text-slate-900 text-base">Market & Salary Insights</h3>
+                        <p class="text-xs text-slate-500 font-medium">Live intelligence computed from your tracked QA jobs</p>
                     </div>
                 </div>
-                <button onclick="closeInsightsModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                <button onclick="closeInsightsModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <!-- Loading indicator -->
-            <div id="insightsLoading" class="py-16 text-center text-gray-400">
+            <div id="insightsLoading" class="py-16 text-center text-slate-400">
                 <i class="fas fa-circle-notch fa-spin text-3xl text-indigo-500 mb-3"></i>
-                <div class="text-xs font-medium text-gray-500">Calculating QA market benchmarks...</div>
+                <div class="text-xs font-bold text-slate-500">Calculating QA market benchmarks...</div>
             </div>
 
-            <!-- Modal Content -->
             <div id="insightsContent" class="hidden p-6 space-y-6 max-h-[82vh] overflow-y-auto">
-                <!-- Row 1: KPI Stats -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div class="bg-gradient-to-br from-emerald-50 to-white p-4 rounded-xl border border-emerald-100/80">
-                        <div class="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider mb-1">Average Salary</div>
+                    <div class="bg-gradient-to-br from-emerald-50 to-white p-4 rounded-2xl border border-emerald-100/80 shadow-2xs">
+                        <div class="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider mb-1">Average Salary</div>
                         <div class="text-2xl font-black text-emerald-600 tracking-tight" id="stat-avg-salary">--</div>
-                        <div class="text-[11px] text-gray-500 font-medium mt-1" id="stat-salary-range">--</div>
+                        <div class="text-[11px] text-slate-500 font-semibold mt-1" id="stat-salary-range">--</div>
                     </div>
                     
-                    <div class="bg-gradient-to-br from-indigo-50 to-white p-4 rounded-xl border border-indigo-100/80">
-                        <div class="text-[11px] font-semibold text-indigo-800 uppercase tracking-wider mb-1">Pay Transparency</div>
+                    <div class="bg-gradient-to-br from-indigo-50 to-white p-4 rounded-2xl border border-indigo-100/80 shadow-2xs">
+                        <div class="text-[11px] font-extrabold text-indigo-800 uppercase tracking-wider mb-1">Pay Transparency</div>
                         <div class="text-2xl font-black text-indigo-600 tracking-tight" id="stat-salary-transparency">--</div>
-                        <div class="text-[11px] text-gray-500 font-medium mt-1" id="stat-salary-count">--</div>
+                        <div class="text-[11px] text-slate-500 font-semibold mt-1" id="stat-salary-count">--</div>
                     </div>
 
-                    <div class="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl border border-blue-100/80">
-                        <div class="text-[11px] font-semibold text-blue-800 uppercase tracking-wider mb-1">Work Location</div>
+                    <div class="bg-gradient-to-br from-blue-50 to-white p-4 rounded-2xl border border-blue-100/80 shadow-2xs">
+                        <div class="text-[11px] font-extrabold text-blue-800 uppercase tracking-wider mb-1">Work Location</div>
                         <div class="text-2xl font-black text-blue-600 tracking-tight flex items-center gap-1.5">
                             <span id="stat-remote-pct">--</span>
-                            <span class="text-xs font-medium text-gray-400">Remote</span>
+                            <span class="text-xs font-semibold text-slate-400">Remote</span>
                         </div>
-                        <div class="text-[11px] text-gray-500 font-medium mt-1">
-                            Tricity: <span id="stat-tricity-pct" class="font-bold text-gray-700">--</span>
+                        <div class="text-[11px] text-slate-500 font-semibold mt-1">
+                            Tricity: <span id="stat-tricity-pct" class="font-extrabold text-slate-700">--</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Row 2: Salary Brackets & Distribution -->
-                <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
+                <div class="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                             <i class="fas fa-layer-group text-emerald-600"></i> Monthly Salary Distribution (PLN)
                         </span>
-                        <span class="text-[11px] text-gray-400">Standardized to B2B/UoP monthly</span>
+                        <span class="text-[11px] text-slate-400 font-medium">Standardized to B2B/UoP monthly</span>
                     </div>
                     <div class="space-y-2.5" id="stat-salary-brackets"></div>
                 </div>
 
-                <!-- Row 3: Funnel & Pipeline -->
-                <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
-                    <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                <div class="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
+                    <span class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                         <i class="fas fa-filter text-purple-600"></i> Pipeline Funnel
                     </span>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                        <div class="bg-white p-2.5 rounded-lg border border-gray-200/80">
-                            <div class="text-[10px] uppercase font-bold text-gray-400">All Tracked</div>
-                            <div class="text-base font-black text-gray-900 mt-0.5" id="funnel-total">--</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-xs">
+                        <div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <div class="text-[10px] uppercase font-bold text-slate-400">All Tracked</div>
+                            <div class="text-base font-black text-slate-900 mt-0.5" id="funnel-total">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-purple-100 bg-purple-50/30">
-                            <div class="text-[10px] uppercase font-bold text-purple-600">Applied</div>
+                        <div class="bg-white p-3 rounded-xl border border-purple-200/80 bg-purple-50/30 shadow-2xs">
+                            <div class="text-[10px] uppercase font-bold text-purple-600">Accepted / Applied</div>
                             <div class="text-base font-black text-purple-700 mt-0.5" id="funnel-applied">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-blue-100 bg-blue-50/30">
+                        <div class="bg-white p-3 rounded-xl border border-blue-200/80 bg-blue-50/30 shadow-2xs">
                             <div class="text-[10px] uppercase font-bold text-blue-600">Screening</div>
                             <div class="text-base font-black text-blue-700 mt-0.5" id="funnel-screen">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-amber-100 bg-amber-50/30">
+                        <div class="bg-white p-3 rounded-xl border border-amber-200/80 bg-amber-50/30 shadow-2xs">
                             <div class="text-[10px] uppercase font-bold text-amber-600">Tech Interview</div>
                             <div class="text-base font-black text-amber-700 mt-0.5" id="funnel-tech">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-emerald-100 bg-emerald-50/30">
+                        <div class="bg-white p-3 rounded-xl border border-emerald-200/80 bg-emerald-50/30 shadow-2xs">
                             <div class="text-[10px] uppercase font-bold text-emerald-600">Offers</div>
                             <div class="text-base font-black text-emerald-700 mt-0.5" id="funnel-offer">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-rose-100 bg-rose-50/30">
+                        <div class="bg-white p-3 rounded-xl border border-rose-200/80 bg-rose-50/30 shadow-2xs">
                             <div class="text-[10px] uppercase font-bold text-rose-600">Rejected</div>
                             <div class="text-base font-black text-rose-700 mt-0.5" id="funnel-rejected">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-gray-200/80">
-                            <div class="text-[10px] uppercase font-bold text-gray-400">New (Queue)</div>
-                            <div class="text-base font-black text-gray-700 mt-0.5" id="funnel-new">--</div>
+                        <div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <div class="text-[10px] uppercase font-bold text-slate-400">New (Queue)</div>
+                            <div class="text-base font-black text-slate-700 mt-0.5" id="funnel-new">--</div>
                         </div>
-                        <div class="bg-white p-2.5 rounded-lg border border-gray-200/80">
-                            <div class="text-[10px] uppercase font-bold text-gray-400">Top Locations</div>
+                        <div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <div class="text-[10px] uppercase font-bold text-slate-400">Top Locations</div>
                             <div class="mt-1 flex flex-wrap gap-1 justify-center" id="stat-top-cities"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Row 4: Portals & In-Demand Skills -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
-                        <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                    <div class="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
+                        <span class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
                             <i class="fas fa-globe text-blue-500"></i> Portal Sources
                         </span>
-                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1" id="stat-portals-list"></div>
+                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar" id="stat-portals-list"></div>
                     </div>
 
-                    <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/60">
-                        <span class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                    <div class="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
+                        <span class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
                             <i class="fas fa-tags text-indigo-500"></i> Mentioned Skills & Keywords
                         </span>
-                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1" id="stat-skills-list"></div>
+                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar" id="stat-skills-list"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Modal Footer -->
-            <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
-                <span>Updated in real-time as jobs are discovered</span>
-                <button onclick="closeInsightsModal()" class="px-4 py-1.5 bg-black hover:bg-gray-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-all">Close</button>
+            <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+                <span class="font-medium">Live market benchmarks computed from discovered QA jobs</span>
+                <button onclick="closeInsightsModal()" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-all">Close</button>
             </div>
         </div>
     </div>
 
     <!-- Refresh Completion Breakdown Toast -->
-    <div id="refreshToast" class="hidden fixed bottom-6 right-6 z-50 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-750 flex items-center gap-3 text-xs max-w-md animate-in slide-in-from-bottom-5 duration-300">
-        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+    <div id="refreshToast" class="hidden fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-750 flex items-center gap-3 text-xs max-w-md animate-in slide-in-from-bottom-5 duration-300">
+        <div class="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
             <i class="fas fa-check-circle text-sm"></i>
         </div>
-        <div class="flex-1 font-medium leading-relaxed" id="refreshToastMsg"></div>
-        <button onclick="closeRefreshToast()" class="text-gray-400 hover:text-white p-1 transition-colors">
+        <div class="flex-1 font-semibold leading-relaxed" id="refreshToastMsg"></div>
+        <button onclick="closeRefreshToast()" class="text-slate-400 hover:text-white p-1 transition-colors">
             <i class="fas fa-times"></i>
         </button>
     </div>

@@ -915,10 +915,22 @@ def scrape_bulldogjob(browser, deep=False):
                 curr = base_sal.get('currency', 'PLN')
                 min_v = val.get('minValue')
                 max_v = val.get('maxValue')
+                unit = (val.get('unitText') or base_sal.get('unitText') or '').upper()
+                u_suffix = ""
+                if unit in ['YEAR', 'ANNUAL', 'YEARLY']:
+                    u_suffix = " / rok"
+                elif unit in ['MONTH', 'MONTHLY']:
+                    u_suffix = " / mies."
+                elif unit in ['HOUR', 'HOURLY']:
+                    u_suffix = " / godz."
+                elif unit in ['DAY', 'DAILY']:
+                    u_suffix = " / dzień"
+                elif unit:
+                    u_suffix = f" / {unit.lower()}"
                 if min_v and max_v:
-                    pay = f"{min_v:,} - {max_v:,} {curr}".replace(',', ' ')
+                    pay = f"{int(min_v):,} - {int(max_v):,} {curr}{u_suffix}".replace(',', ' ')
                 elif min_v:
-                    pay = f"od {min_v:,} {curr}".replace(',', ' ')
+                    pay = f"od {int(min_v):,} {curr}{u_suffix}".replace(',', ' ')
                     
             # Published date
             pub_date = ld_data.get('datePosted', '')
@@ -1096,10 +1108,22 @@ def scrape_solidjobs(browser, deep=False):
                 curr = base_sal.get('currency', 'PLN')
                 min_v = val.get('minValue')
                 max_v = val.get('maxValue')
+                unit = (val.get('unitText') or base_sal.get('unitText') or '').upper()
+                u_suffix = ""
+                if unit in ['YEAR', 'ANNUAL', 'YEARLY']:
+                    u_suffix = " / rok"
+                elif unit in ['MONTH', 'MONTHLY']:
+                    u_suffix = " / mies."
+                elif unit in ['HOUR', 'HOURLY']:
+                    u_suffix = " / godz."
+                elif unit in ['DAY', 'DAILY']:
+                    u_suffix = " / dzień"
+                elif unit:
+                    u_suffix = f" / {unit.lower()}"
                 if min_v and max_v:
-                    pay = f"{int(min_v):,} - {int(max_v):,} {curr}".replace(',', ' ')
+                    pay = f"{int(min_v):,} - {int(max_v):,} {curr}{u_suffix}".replace(',', ' ')
                 elif min_v:
-                    pay = f"od {int(min_v):,} {curr}".replace(',', ' ')
+                    pay = f"od {int(min_v):,} {curr}{u_suffix}".replace(',', ' ')
                     
             pub_date = ld_data.get('datePosted', '')
             if pub_date:
@@ -1454,10 +1478,22 @@ def scrape_linkedin(browser, deep=False):
                 curr = base_sal.get('currency', 'PLN')
                 min_v = val.get('minValue')
                 max_v = val.get('maxValue')
+                unit = (val.get('unitText') or base_sal.get('unitText') or '').upper()
+                u_suffix = ""
+                if unit in ['YEAR', 'ANNUAL', 'YEARLY']:
+                    u_suffix = " / rok"
+                elif unit in ['MONTH', 'MONTHLY']:
+                    u_suffix = " / mies."
+                elif unit in ['HOUR', 'HOURLY']:
+                    u_suffix = " / godz."
+                elif unit in ['DAY', 'DAILY']:
+                    u_suffix = " / dzień"
+                elif unit:
+                    u_suffix = f" / {unit.lower()}"
                 if min_v and max_v:
-                    pay = f"{int(min_v):,} - {int(max_v):,} {curr}".replace(',', ' ')
+                    pay = f"{int(min_v):,} - {int(max_v):,} {curr}{u_suffix}".replace(',', ' ')
                 elif min_v:
-                    pay = f"od {int(min_v):,} {curr}".replace(',', ' ')
+                    pay = f"od {int(min_v):,} {curr}{u_suffix}".replace(',', ' ')
             else:
                 m_pay = parsers.PAY_REGEX.search(desc)
                 if m_pay:

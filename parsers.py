@@ -104,7 +104,7 @@ def clean_pay(val: str) -> str:
         period = '/ h'
     elif any(k in lower for k in ['dziennie', 'dzień', 'dzien', '/ day', '/ d', '/d', 'per day']):
         period = '/ d'
-    elif any(k in lower for k in ['rocznie', 'rok', '/ year', '/ y', '/y', 'per year']):
+    elif any(k in lower for k in ['rocznie', 'rok', '/ year', '/ y', '/y', 'per year', 'annual', 'annually']):
         period = '/ y'
     elif any(k in lower for k in ['miesi', '/ month', '/ m', '/m', 'per month']):
         period = '/ m'
@@ -126,7 +126,7 @@ def clean_pay(val: str) -> str:
     s = re.sub(r'(?i)brutto|netto', '', s)
     s = re.sub(r'(?i)oblicz\s*[\"\']?na\s*r[eę]k[eę][\"\']?', '', s)
     s = re.sub(r'(?i)oblicz\s*netto', '', s)
-    s = re.sub(r'(?i)miesięcznie|miesiecznie|godzinowo|dziennie|rocznie|month|hour|year|day', '', s)
+    s = re.sub(r'(?i)miesięcznie|miesiecznie|godzinowo|dziennie|rocznie|month|hour|year|day|annual|annually', '', s)
     s = re.sub(r'(?i)pln|eur|usd|gbp|zł|zl', '', s)
     s = re.sub(r'[/\\()]', '', s)
     s = s.replace('"', '').replace("'", '')
@@ -144,16 +144,17 @@ def clean_pay(val: str) -> str:
         return "Not given"
         
     num_part = nums_match.group(1).strip()
-    if '–' in num_part:
-        parts = [p.strip() for p in num_part.split('–')]
+    if '–' in num_part or '-' in num_part or '—' in num_part:
+        parts = [p.strip() for p in re.split(r'[-–—]', num_part)]
         if len(parts) == 2 and parts[0] and parts[1]:
-            num_part = f"{parts[0]} – {parts[1]}"
+            num_part = f"{parts[0]} - {parts[1]}"
         elif len(parts) == 2 and parts[0]:
             num_part = parts[0]
             
     res = f"{num_part} {curr}"
     if period:
-        res += f" {period}"
+        p_map = {'/ y': ' / rok', '/ m': ' / mies.', '/ h': ' / godz.', '/ d': ' / dzień'}
+        res += p_map.get(period, f" {period}")
     return res
 
 def extract_pracuj_salary(soup: BeautifulSoup) -> str:
@@ -178,8 +179,50 @@ def extract_protocol_salary(soup: BeautifulSoup) -> str:
         txt = node.get_text(strip=True)
         unit_node = soup.find(attrs={'data-test': 'text-contractTimeUnits'})
         if unit_node:
-            txt += " " + unit_node.get_text(strip=True)
+            txt += f" {unit_node.get_text(strip=True)}"
         return clean_pay(txt)
+    return "Not given"
+
+def extract_nofluff_salary(soup: BeautifulSoup) -> str:
+    """Extract salary from NoFluffJobs metadata or DOM."""
+    if not soup:
+        return "Not given"
+    for s in soup.find_all('script', type='application/ld+json'):
+        if not s.string: continue
+        try:
+            d = json.loads(s.string)
+            if 'baseSalary' in d and isinstance(d['baseSalary'], dict):
+                bs = d['baseSalary']
+                curr = bs.get('currency', 'PLN')
+                val = bs.get('value', {})
+                min_v = val.get('minValue')
+                max_v = val.get('maxValue')
+                unit = (val.get('unitText') or bs.get('unitText') or '').upper()
+                u_suffix = ""
+                if unit in ['YEAR', 'ANNUAL', 'YEARLY']:
+                    u_suffix = " / rok"
+                elif unit in ['MONTH', 'MONTHLY']:
+                    u_suffix = " / mies."
+                elif unit in ['HOUR', 'HOURLY']:
+                    u_suffix = " / godz."
+                elif unit in ['DAY', 'DAILY']:
+                    u_suffix = " / dzień"
+                elif unit:
+                    u_suffix = f" / {unit.lower()}"
+                if min_v and max_v:
+                    return f"{int(min_v):,} - {int(max_v):,} {curr}{u_suffix}".replace(',', ' ')
+                elif min_v:
+                    return f"{int(min_v):,} {curr}{u_suffix}".replace(',', ' ')
+        except:
+            pass
+    h1 = soup.find('h1')
+    if h1:
+        parent = h1.find_parent('div')
+        if parent:
+            for span in parent.find_all(['span', 'div']):
+                t = span.get_text(strip=True)
+                if any(c in t for c in ['PLN', 'EUR', 'USD', 'zł']) and re.search(r'\d', t):
+                    return clean_pay(t)
     return "Not given"
 
 def extract_jjit_salary(soup: BeautifulSoup) -> str:
@@ -196,12 +239,22 @@ def extract_jjit_salary(soup: BeautifulSoup) -> str:
                 val = bs.get('value', {})
                 min_v = val.get('minValue')
                 max_v = val.get('maxValue')
-                unit = val.get('unitText', '')
+                unit = (val.get('unitText') or bs.get('unitText') or '').upper()
+                u_suffix = ""
+                if unit in ['YEAR', 'ANNUAL', 'YEARLY']:
+                    u_suffix = " / rok"
+                elif unit in ['MONTH', 'MONTHLY']:
+                    u_suffix = " / mies."
+                elif unit in ['HOUR', 'HOURLY']:
+                    u_suffix = " / godz."
+                elif unit in ['DAY', 'DAILY']:
+                    u_suffix = " / dzień"
+                elif unit:
+                    u_suffix = f" / {unit.lower()}"
                 if min_v and max_v:
-                    u_str = f" / {unit.lower()}" if unit else ""
-                    return f"{min_v:,} - {max_v:,} {curr}{u_str}".replace(',', ' ')
+                    return f"{int(min_v):,} - {int(max_v):,} {curr}{u_suffix}".replace(',', ' ')
                 elif min_v:
-                    return f"{min_v:,} {curr}".replace(',', ' ')
+                    return f"{int(min_v):,} {curr}{u_suffix}".replace(',', ' ')
         except:
             pass
     h1 = soup.find('h1')
@@ -231,8 +284,22 @@ def extract_nfj_salary(soup: BeautifulSoup) -> str:
                         val = bs.get('value', {})
                         min_v = val.get('minValue')
                         max_v = val.get('maxValue')
+                        unit = (val.get('unitText') or bs.get('unitText') or '').upper()
+                        u_suffix = ""
+                        if unit in ['YEAR', 'ANNUAL', 'YEARLY']:
+                            u_suffix = " / rok"
+                        elif unit in ['MONTH', 'MONTHLY']:
+                            u_suffix = " / mies."
+                        elif unit in ['HOUR', 'HOURLY']:
+                            u_suffix = " / godz."
+                        elif unit in ['DAY', 'DAILY']:
+                            u_suffix = " / dzień"
+                        elif unit:
+                            u_suffix = f" / {unit.lower()}"
                         if min_v and max_v:
-                            return f"{min_v:,} - {max_v:,} {curr}".replace(',', ' ')
+                            return f"{int(min_v):,} - {int(max_v):,} {curr}{u_suffix}".replace(',', ' ')
+                        elif min_v:
+                            return f"{int(min_v):,} {curr}{u_suffix}".replace(',', ' ')
         except:
             pass
     for el in soup.find_all(['h4', 'span', 'div'], class_=lambda c: c and 'salary' in str(c).lower()):

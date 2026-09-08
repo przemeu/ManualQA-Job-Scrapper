@@ -742,14 +742,22 @@
             if (!vals.length) return -1;
             let maxV = Math.max(...vals);
             const lower = pay.toLowerCase();
-            if (lower.includes('godz') || lower.includes('hour') || lower.includes('/ h') || lower.includes('/h')) maxV *= 168;
-            else if (lower.includes('dzien') || lower.includes('day') || lower.includes('/ d') || lower.includes('/d')) maxV *= 21;
-            else if (lower.includes('rok') || lower.includes('year') || lower.includes('/ y') || lower.includes('/y')) maxV /= 12;
-            if (pay.includes('EUR') || pay.includes('€')) maxV *= 4.3;
+            const isEur = pay.includes('EUR') || pay.includes('€');
+            const isUsd = pay.includes('USD') || pay.includes('$');
+            const isHourly = lower.includes('godz') || lower.includes('hour') || lower.includes('/ h') || lower.includes('/h');
+            const isDaily = lower.includes('dzien') || lower.includes('dzień') || lower.includes('day') || lower.includes('/ d') || lower.includes('/d');
+            const isYearly = lower.includes('rok') || lower.includes('year') || lower.includes('/ y') || lower.includes('/y') || lower.includes('annual') || lower.includes('annually') || lower.includes('roczn') || ((isEur || isUsd) && maxV >= 20000) || (!isEur && !isUsd && maxV >= 80000);
+
+            if (isHourly) maxV *= 168;
+            else if (isDaily) maxV *= 21;
+            else if (isYearly) maxV /= 12;
+
+            if (isEur) maxV *= 4.3;
+            else if (isUsd) maxV *= 4.0;
             return maxV;
         }
 
-        function calculateNetTakeHome(payStr) {
+        function calculateNetTakeHome(payStr, contractType = '') {
             if (!payStr || payStr === 'Not given' || payStr === 'brak widełek') return null;
             
             const cleaned = payStr.replace(/\xa0/g, ' ').replace(',', '.');
@@ -765,15 +773,17 @@
             let avgGross = (minV + maxV) / 2.0;
             
             const isEur = payStr.includes('EUR') || payStr.includes('€');
-            if (isEur) {
-                avgGross *= 4.30;
-            }
+            const isUsd = payStr.includes('USD') || payStr.includes('$');
             
             const lower = payStr.toLowerCase();
             const isHourly = lower.includes('/ h') || lower.includes('/h') || lower.includes('godz') || lower.includes('hour');
-            const isDaily = lower.includes('/ d') || lower.includes('/d') || lower.includes('dzien') || lower.includes('day');
-            const isYearly = lower.includes('/ y') || lower.includes('/y') || lower.includes('rok') || lower.includes('year');
+            const isDaily = lower.includes('/ d') || lower.includes('/d') || lower.includes('dzien') || lower.includes('dzień') || lower.includes('day');
+            let isYearly = lower.includes('/ y') || lower.includes('/y') || lower.includes('rok') || lower.includes('year') || lower.includes('annual') || lower.includes('annually') || lower.includes('roczn');
             
+            if (!isHourly && !isDaily && (((isEur || isUsd) && minV >= 20000) || (!isEur && !isUsd && minV >= 80000))) {
+                isYearly = true;
+            }
+
             let monthlyBase = avgGross;
             if (isHourly) {
                 monthlyBase = avgGross * 168; // 21 working days * 8h
@@ -782,15 +792,29 @@
             } else if (isYearly) {
                 monthlyBase = avgGross / 12.0;
             } else {
-                if (avgGross < 300 && !isEur) {
+                if (avgGross < 300 && !isEur && !isUsd) {
                     monthlyBase = avgGross * 168;
                 } else {
                     monthlyBase = avgGross;
                 }
             }
+
+            if (isEur) {
+                monthlyBase *= 4.30;
+            } else if (isUsd) {
+                monthlyBase *= 4.0;
+            }
             
             // Contract detection
-            const isB2b = isHourly || isDaily || lower.includes('b2b') || monthlyBase >= 14000;
+            const ctypeLower = (contractType || '').toLowerCase();
+            let isB2b = false;
+            if (ctypeLower.includes('b2b') && !ctypeLower.includes('uop')) {
+                isB2b = true;
+            } else if (ctypeLower.includes('uop') && !ctypeLower.includes('b2b')) {
+                isB2b = false;
+            } else {
+                isB2b = isHourly || isDaily || lower.includes('b2b') || ctypeLower.includes('b2b') || monthlyBase >= 14000;
+            }
             
             if (isB2b) {
                 // B2B Ryczałt 8.5% (Poland 2026 Manual QA standard)
@@ -838,7 +862,7 @@
         function getContractTypeBadge(job, isCompact = false) {
             let ctype = (job.contract_type || '').trim();
             if (!ctype) {
-                const netInfo = calculateNetTakeHome(job.pay);
+                const netInfo = calculateNetTakeHome(job.pay, job.contract_type);
                 ctype = netInfo ? netInfo.contract_type : 'B2B / UoP';
             }
 
@@ -1147,7 +1171,7 @@
 
                 const portalBadgeClass = PORTAL_COLORS[job.source] || 'bg-slate-100 text-slate-700 border-slate-200';
 
-                const netInfo = calculateNetTakeHome(job.pay);
+                const netInfo = calculateNetTakeHome(job.pay, job.contract_type);
                 let netBadgeHtml = '';
                 if (netInfo) {
                     const formattedNet = netInfo.net_monthly.toLocaleString('pl-PL').replace(/\s/g, ' ');
@@ -1270,7 +1294,7 @@
                                 <div class="flex items-center gap-1.5 flex-wrap">
                                     <span class="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70 shadow-2xs text-[10px]"><i class="fas fa-coins mr-1 text-emerald-600"></i>${job.pay}</span>
                                     ${(() => {
-                                        const net = calculateNetTakeHome(job.pay);
+                                        const net = calculateNetTakeHome(job.pay, job.contract_type);
                                         if (!net) return '';
                                         const fmt = net.net_monthly.toLocaleString('pl-PL').replace(/\s/g, ' ');
                                         return `<span class="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/70 shadow-2xs text-[10px]" title="Estimated net take-home"><i class="fas fa-wallet mr-1 text-teal-600"></i>~${fmt} zł (${net.contract_type})</span>`;

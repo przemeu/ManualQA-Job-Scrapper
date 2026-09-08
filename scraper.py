@@ -786,7 +786,7 @@ def scrape_bulldogjob(browser, deep=False):
                 soup = BeautifulSoup(page.content(), 'html.parser')
                 for a in soup.find_all('a', href=True):
                     href = a['href']
-                    if '/companies/jobs/' in href and any(c.isdigit() for c in href):
+                    if '/companies/jobs/' in href and '/companies/jobs/s/' not in href and any(c.isdigit() for c in href):
                         full = href if href.startswith('http') else f"https://bulldogjob.pl{href}"
                         if full not in all_urls:
                             all_urls.append(full)

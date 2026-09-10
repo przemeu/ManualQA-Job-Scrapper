@@ -93,6 +93,7 @@ def init_db():
     backfill_empty_companies()
     backfill_clean_pay()
     backfill_contract_types()
+    backfill_normalize_dates()
     clean_database_duplicates()
 
 def infer_contract_type(title="", url="", source="", pay="", full_text=""):
@@ -151,6 +152,23 @@ def backfill_clean_pay():
         cleaned = parsers.clean_pay(old_pay)
         if cleaned != old_pay:
             cursor.execute("UPDATE jobs SET pay = ? WHERE id = ?", (cleaned, r['id']))
+            updated += 1
+    conn.commit()
+    conn.close()
+    return updated
+
+def backfill_normalize_dates():
+    import parsers
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, published_at FROM jobs WHERE published_at IS NOT NULL AND published_at != ''")
+    rows = cursor.fetchall()
+    updated = 0
+    for r in rows:
+        old_d = r['published_at']
+        cleaned = parsers.normalize_date(old_d)
+        if cleaned != old_d:
+            cursor.execute("UPDATE jobs SET published_at = ? WHERE id = ?", (cleaned, r['id']))
             updated += 1
     conn.commit()
     conn.close()

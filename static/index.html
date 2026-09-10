@@ -227,11 +227,13 @@
                 <div class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-2.5 py-1 text-[11px] shadow-2xs font-semibold text-slate-700">
                     <i class="fas fa-sort text-slate-400 text-[10px]"></i>
                     <select id="sortSelect" onchange="applySort(this.value)" class="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer">
-                        <option value="date-desc">📅 Newest</option>
-                        <option value="company-asc">🏢 Firm (A–Z)</option>
-                        <option value="company-desc">🏢 Firm (Z–A)</option>
-                        <option value="salary-desc">💰 Highest Salary</option>
-                        <option value="title-asc">🔤 Title (A–Z)</option>
+                        <option value="published-desc">📅 Data ogłoszenia (najnowsze)</option>
+                        <option value="published-asc">📅 Data ogłoszenia (najstarsze)</option>
+                        <option value="date-desc">📥 Data pobrania (najnowsze)</option>
+                        <option value="salary-desc">💰 Najwyższe zarobki</option>
+                        <option value="company-asc">🏢 Firma (A–Z)</option>
+                        <option value="company-desc">🏢 Firma (Z–A)</option>
+                        <option value="title-asc">🔤 Tytuł (A–Z)</option>
                     </select>
                 </div>
                 
@@ -669,7 +671,7 @@
         let progressInterval = null;
         let allCurrentJobs = [];
         let acceptedJobsCount = 0;
-        let currentSort = 'date-desc';
+        let currentSort = localStorage.getItem('job_fetcher_sort') || 'published-desc';
         let activeFilters = {
             salary: false,
             remote: false,
@@ -813,6 +815,43 @@
             return maxV;
         }
 
+        function parseOfferDate(dateStr, fallbackCreatedAt) {
+            if (!dateStr || dateStr === 'Not given' || dateStr === 'Brak daty' || dateStr === 'None') {
+                if (fallbackCreatedAt) {
+                    return new Date(String(fallbackCreatedAt).replace(' ', 'T') + 'Z').getTime() || 0;
+                }
+                return 0;
+            }
+            const s = String(dateStr).trim();
+            const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) {
+                return new Date(`${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}T00:00:00Z`).getTime();
+            }
+            const plMonths = {
+                'sty': 0, 'lut': 1, 'mar': 2, 'kwi': 3, 'maj': 4, 'cze': 5,
+                'lip': 6, 'sie': 7, 'wrz': 8, 'paź': 9, 'paz': 9, 'lis': 10, 'gru': 11
+            };
+            const parts = s.toLowerCase().split(/\s+/);
+            if (parts.length >= 3) {
+                const day = parseInt(parts[0], 10);
+                const monStr = parts[1];
+                const year = parseInt(parts[2], 10);
+                if (!isNaN(day) && !isNaN(year)) {
+                    for (const [key, mIndex] of Object.entries(plMonths)) {
+                        if (monStr.startsWith(key)) {
+                            return new Date(Date.UTC(year, mIndex, day)).getTime();
+                        }
+                    }
+                }
+            }
+            const t = new Date(s).getTime();
+            if (!isNaN(t) && t > 0) return t;
+            if (fallbackCreatedAt) {
+                return new Date(String(fallbackCreatedAt).replace(' ', 'T') + 'Z').getTime() || 0;
+            }
+            return 0;
+        }
+
         function calculateNetTakeHome(payStr, contractType = '') {
             if (!payStr || payStr === 'Not given' || payStr === 'brak widełek') return null;
             
@@ -938,6 +977,7 @@
 
         function applySort(sortVal) {
             currentSort = sortVal;
+            try { localStorage.setItem('job_fetcher_sort', sortVal); } catch(e){}
             applyFilters();
         }
 
@@ -1021,7 +1061,23 @@
                 if (currentSort === 'salary-desc') {
                     return parseSalaryNumber(b.pay) - parseSalaryNumber(a.pay);
                 }
-                // Default: date-desc
+                if (currentSort === 'published-asc') {
+                    const pA = parseOfferDate(a.published_at, a.created_at);
+                    const pB = parseOfferDate(b.published_at, b.created_at);
+                    if (pA !== pB) return pA - pB;
+                    const tA = new Date((a.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
+                    const tB = new Date((b.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
+                    return tA - tB;
+                }
+                if (currentSort === 'date-desc') {
+                    const tA = new Date((a.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
+                    const tB = new Date((b.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
+                    return tB - tA;
+                }
+                // Default / published-desc: Najnowsza data dodania ogłoszenia
+                const pA = parseOfferDate(a.published_at, a.created_at);
+                const pB = parseOfferDate(b.published_at, b.created_at);
+                if (pB !== pA) return pB - pA;
                 const tA = new Date((a.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
                 const tB = new Date((b.created_at || '').replace(' ', 'T') + 'Z').getTime() || 0;
                 return tB - tA;
@@ -1339,6 +1395,7 @@
                             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${portalBadgeClass}">${job.source}</span>
                             ${job.city ? `<span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200/60"><i class="fas fa-map-marker-alt mr-0.5 text-blue-500"></i>${job.city}</span>` : ''}
                             ${getContractTypeBadge(job, true)}
+                            ${job.published_at ? `<span class="text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md border border-purple-200/60 shadow-2xs" title="Data ogłoszenia"><i class="far fa-calendar-alt mr-0.5 text-[9px]"></i>${job.published_at}</span>` : ''}
                         </div>
 
                         <div class="space-y-1 text-[11px]">
@@ -2341,6 +2398,8 @@
         }
 
         // Initial load
+        const sortSelInit = document.getElementById('sortSelect');
+        if (sortSelInit) sortSelInit.value = currentSort;
         restoreLaneWidths();
         fetchJobs();
         loadSettings();

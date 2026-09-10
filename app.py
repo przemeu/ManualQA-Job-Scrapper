@@ -339,17 +339,18 @@ def get_jobs(status: str = 'NEW'):
     conn = database.get_db()
     cursor = conn.cursor()
     status_upper = status.upper()
+    order_clause = "ORDER BY COALESCE(NULLIF(published_at, ''), SUBSTR(created_at, 1, 10)) DESC, created_at DESC"
     if status_upper == 'ALL':
         cursor.execute(
-            "SELECT * FROM jobs WHERE status != 'WRONG' ORDER BY created_at DESC"
+            f"SELECT * FROM jobs WHERE status != 'WRONG' {order_clause}"
         )
     elif status_upper in ['ACCEPTED', 'APPLIED']:
         cursor.execute(
-            "SELECT * FROM jobs WHERE status IN ('APPLIED', 'ACCEPTED') ORDER BY created_at DESC"
+            f"SELECT * FROM jobs WHERE status IN ('APPLIED', 'ACCEPTED') {order_clause}"
         )
     else:
         cursor.execute(
-            "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC", 
+            f"SELECT * FROM jobs WHERE status = ? {order_clause}", 
             (status_upper,)
         )
     rows = cursor.fetchall()

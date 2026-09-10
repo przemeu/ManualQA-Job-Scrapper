@@ -169,6 +169,28 @@ def clean_pay(val: str) -> str:
         res += p_map.get(period, f" {period}")
     return res
 
+def normalize_date(val: str) -> str:
+    """Normalize date string to YYYY-MM-DD format."""
+    if not val or val.strip() in ['Not given', 'Brak daty', 'None', '-']:
+        return ""
+    s = val.strip()
+    m = re.match(r'^(\d{4}-\d{2}-\d{2})', s)
+    if m:
+        return m.group(1)
+    pl_months = {
+        'sty': '01', 'lut': '02', 'mar': '03', 'kwi': '04', 'maj': '05', 'cze': '06',
+        'lip': '07', 'sie': '08', 'wrz': '09', 'paź': '10', 'paz': '10', 'lis': '11', 'gru': '12'
+    }
+    m_pl = re.match(r'^(\d{1,2})\s+([a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+)\s+(\d{4})', s)
+    if m_pl:
+        day = m_pl.group(1).zfill(2)
+        mon_str = m_pl.group(2).lower()
+        year = m_pl.group(3)
+        for k, v in pl_months.items():
+            if mon_str.startswith(k):
+                return f"{year}-{v}-{day}"
+    return s
+
 def extract_pracuj_salary(soup: BeautifulSoup) -> str:
     """Extract salary from Pracuj offer header only, ignoring recommended offers."""
     if not soup:

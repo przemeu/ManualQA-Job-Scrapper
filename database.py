@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from typing import Optional, Dict, Any, List
 
 DB_PATH = 'jobs.db'
 
@@ -72,6 +73,19 @@ def init_db():
             value TEXT
         )
     ''')
+    # Default settings
+    defaults = {
+        'auto_scan_enabled': 'false',
+        'scan_interval_minutes': '60',
+        'desktop_notifications': 'true',
+        'telegram_notifications': 'false',
+        'telegram_token': '',
+        'telegram_chat_id': '',
+        'last_scan_time': ''
+    }
+    for k, v in defaults.items():
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+        
     conn.commit()
     conn.close()
     
@@ -79,6 +93,7 @@ def init_db():
     backfill_empty_companies()
     backfill_clean_pay()
     backfill_contract_types()
+    clean_database_duplicates()
 
 def infer_contract_type(title="", url="", source="", pay="", full_text=""):
     import re
@@ -222,22 +237,6 @@ def backfill_empty_companies():
     conn.commit()
     conn.close()
     return updated
-    
-    # Default settings
-    defaults = {
-        'auto_scan_enabled': 'false',
-        'scan_interval_minutes': '60',
-        'desktop_notifications': 'true',
-        'telegram_notifications': 'false',
-        'telegram_token': '',
-        'telegram_chat_id': '',
-        'last_scan_time': ''
-    }
-    for k, v in defaults.items():
-        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
-        
-    conn.commit()
-    conn.close()
 
 def get_setting(key: str, default: str = "") -> str:
     conn = get_db()
@@ -286,6 +285,213 @@ def update_job_pipeline(job_id: int, stage: str = None, notes: str = None, salar
         cursor.execute(sql, tuple(params))
         conn.commit()
     conn.close()
+
+def find_duplicate_job(title: str, company: str, url: str, conn_or_cursor=None) -> Optional[dict]:
+    """
+    Check if a job offer already exists in the database.
+    Matches by canonical clean_url OR by normalized (company, title) across portals.
+    """
+    import parsers
+    cu = parsers.clean_url(url)
+    nc = parsers.normalize_company(company)
+    nt = parsers.normalize_title(title)
+    
+    close_at_end = False
+    if conn_or_cursor is None:
+        conn = get_db()
+        cursor = conn.cursor()
+        close_at_end = True
+    elif isinstance(conn_or_cursor, sqlite3.Connection):
+        conn = conn_or_cursor
+        cursor = conn.cursor()
+    else:
+        cursor = conn_or_cursor
+        conn = None
+
+    try:
+        # 1. Exact or clean URL match
+        if cu:
+            cursor.execute("SELECT * FROM jobs WHERE url = ? OR url LIKE ?", (cu, cu + '%'))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+                
+        # 2. Cross-portal (company, title) match
+        if nc and nt and not parsers.is_generic_company(nc):
+            cursor.execute("SELECT * FROM jobs")
+            for r in cursor.fetchall():
+                r_nc = parsers.normalize_company(r['company'] or '')
+                r_nt = parsers.normalize_title(r['title'] or '')
+                if r_nc == nc and r_nt == nt:
+                    return dict(r)
+    finally:
+        if close_at_end and conn:
+            conn.close()
+            
+    return None
+
+def clean_database_duplicates(conn=None) -> dict:
+    """
+    Finds duplicate clusters across all portals in jobs.db and removes duplicates.
+    Resolution priority:
+    1. If any job in the cluster is APPLIED / ACCEPTED, keep that job (the only accepted one).
+       If multiple are APPLIED, keep the one with most pipeline progress/earliest applied.
+    2. If none are APPLIED, keep the earliest user-evaluated decision (IGNORED or WRONG).
+    3. If none are evaluated (all NEW), keep the earliest created record.
+    4. Merges rich metadata (specific company, salary, city, notes) into the winner before deleting losers.
+    5. Normalizes all remaining URLs to clean canonical URLs.
+    """
+    import parsers
+    from collections import defaultdict
+    
+    close_at_end = False
+    if conn is None:
+        conn = get_db()
+        close_at_end = True
+        
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM jobs ORDER BY id ASC")
+    rows = [dict(r) for r in cursor.fetchall()]
+    
+    if not rows:
+        if close_at_end:
+            conn.close()
+        return {"clusters_found": 0, "deleted_count": 0, "remaining": 0}
+        
+    parent = {r['id']: r['id'] for r in rows}
+    def find(i):
+        if parent[i] != i:
+            parent[i] = find(parent[i])
+        return parent[i]
+
+    def union(i, j):
+        ri = find(i)
+        rj = find(j)
+        if ri != rj:
+            parent[ri] = rj
+
+    # 1. Group by clean_url
+    url_map = defaultdict(list)
+    for r in rows:
+        cu = parsers.clean_url(r['url'])
+        if cu:
+            url_map[cu].append(r['id'])
+
+    for ids in url_map.values():
+        for a, b in zip(ids[:-1], ids[1:]):
+            union(a, b)
+
+    # 2. Group by normalized (company, title)
+    comp_title_map = defaultdict(list)
+    for r in rows:
+        nc = parsers.normalize_company(r['company'] or '')
+        nt = parsers.normalize_title(r['title'] or '')
+        if nc and nt and not parsers.is_generic_company(nc):
+            comp_title_map[(nc, nt)].append(r['id'])
+
+    for ids in comp_title_map.values():
+        for a, b in zip(ids[:-1], ids[1:]):
+            union(a, b)
+
+    clusters = defaultdict(list)
+    for r in rows:
+        clusters[find(r['id'])].append(r)
+
+    dup_clusters = [c for c in clusters.values() if len(c) > 1]
+    deleted_ids = []
+    cluster_summaries = []
+    
+    for c in dup_clusters:
+        c.sort(key=lambda x: x['id'])
+        applied = [x for x in c if x.get('status') in ('APPLIED', 'ACCEPTED')]
+        
+        if applied:
+            winner = sorted(applied, key=lambda x: (
+                bool((x.get('notes') or '').strip() or (x.get('interview_date') or '').strip() or (x.get('stage') and x.get('stage') not in ('To Apply', 'Applied'))),
+                -x['id']
+            ), reverse=True)[0]
+        else:
+            evaluated = [x for x in c if x.get('status') in ('IGNORED', 'WRONG')]
+            if evaluated:
+                winner = evaluated[0]
+            else:
+                winner = c[0]
+
+        losers = [x for x in c if x['id'] != winner['id']]
+        loser_ids = [x['id'] for x in losers]
+        deleted_ids.extend(loser_ids)
+        
+        # Merge useful metadata from losers to winner
+        updated_fields = {}
+        winner_nc = parsers.normalize_company(winner.get('company') or '')
+        if parsers.is_generic_company(winner_nc):
+            better_comp = next((x['company'] for x in c if not parsers.is_generic_company(parsers.normalize_company(x.get('company') or ''))), None)
+            if better_comp:
+                updated_fields['company'] = better_comp
+                winner['company'] = better_comp
+
+        if (not winner.get('pay') or winner.get('pay') == 'Not given') and any(x.get('pay') and x.get('pay') != 'Not given' for x in c):
+            better_pay = next(x['pay'] for x in c if x.get('pay') and x.get('pay') != 'Not given')
+            updated_fields['pay'] = better_pay
+            winner['pay'] = better_pay
+
+        if (not winner.get('city') or winner.get('city') == 'Remote') and any(x.get('city') and 'remote' not in x.get('city').lower() for x in c):
+            better_city = next(x['city'] for x in c if x.get('city') and 'remote' not in x.get('city').lower())
+            updated_fields['city'] = better_city
+            winner['city'] = better_city
+
+        # Merge notes if any
+        loser_notes = [x['notes'].strip() for x in c if x['id'] != winner['id'] and (x.get('notes') or '').strip()]
+        if loser_notes:
+            winner_note = (winner.get('notes') or '').strip()
+            all_notes = ([winner_note] if winner_note else []) + [n for n in loser_notes if n != winner_note]
+            combined_notes = "\n".join(all_notes)
+            if combined_notes != winner_note:
+                updated_fields['notes'] = combined_notes
+                winner['notes'] = combined_notes
+
+        # Canonical clean URL
+        winner_clean_url = parsers.clean_url(winner.get('url') or '')
+        if winner_clean_url and winner_clean_url != winner.get('url'):
+            updated_fields['url'] = winner_clean_url
+            winner['url'] = winner_clean_url
+
+        if updated_fields:
+            set_clause = ", ".join([f"{k} = ?" for k in updated_fields.keys()])
+            cursor.execute(f"UPDATE jobs SET {set_clause} WHERE id = ?", list(updated_fields.values()) + [winner['id']])
+
+        cursor.execute(f"DELETE FROM jobs WHERE id IN ({','.join(['?']*len(loser_ids))})", loser_ids)
+        
+        cluster_summaries.append({
+            "winner_id": winner['id'],
+            "winner_title": winner['title'],
+            "winner_company": winner['company'],
+            "winner_status": winner['status'],
+            "deleted_ids": loser_ids
+        })
+
+    # Ensure all remaining URLs are canonical clean URLs
+    cursor.execute("SELECT id, url FROM jobs")
+    for r in cursor.fetchall():
+        cu = parsers.clean_url(r['url'])
+        if cu and cu != r['url']:
+            try:
+                cursor.execute("UPDATE jobs SET url = ? WHERE id = ?", (cu, r['id']))
+            except sqlite3.IntegrityError:
+                cursor.execute("DELETE FROM jobs WHERE id = ?", (r['id'],))
+                deleted_ids.append(r['id'])
+
+    conn.commit()
+    if close_at_end:
+        conn.close()
+
+    return {
+        "total_before": len(rows),
+        "clusters_found": len(dup_clusters),
+        "deleted_count": len(deleted_ids),
+        "remaining": len(rows) - len(deleted_ids),
+        "clusters": cluster_summaries
+    }
 
 if __name__ == '__main__':
     init_db()

@@ -1,5 +1,6 @@
 import re
 import json
+from urllib.parse import urlparse, urlunparse
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional, Any
 
@@ -527,27 +528,95 @@ def parse_protocol(html_node: BeautifulSoup, url: str) -> Optional[Dict[str, str
 # 2. Deduplication Logic
 # ==========================================
 
+def clean_url(url: str) -> str:
+    """Normalize URL by stripping tracking parameters, hashes, and trailing slashes."""
+    if not url:
+        return ""
+    try:
+        p = urlparse(url.strip())
+        path = p.path.rstrip('/')
+        return urlunparse((p.scheme.lower(), p.netloc.lower(), path, '', '', ''))
+    except Exception:
+        return url.strip().rstrip('/')
+
+def normalize_company(c: str) -> str:
+    """Normalize company name by stripping domains, legal suffixes, and noise words."""
+    if not c:
+        return ""
+    c = c.lower()
+    # Strip web extensions like .io, .pl, .com, etc.
+    c = re.sub(r'\.(?:io|pl|com|co|net|org|eu|ai)\b', '', c, flags=re.I)
+    # Replace separators and underscores with spaces
+    c = c.replace('_', ' ').replace('-', ' ').replace('.', ' ').replace('/', ' ')
+    # Strip legal suffixes and generic company words
+    c = re.sub(r'\b(sp\s*z\s*o\s*o|sp\s*zoo|sp\s*k|sp[oó]ka\s*akcyjna|s\s*a|inc|llc|gmbh|poland|polska|group|grupa|technologies|technology|partners?|labs?|software|solutions?)\b', '', c, flags=re.I)
+    # Strip non-alphanumeric (keeping unicode letters/numbers like ą, ć, etc.)
+    c = re.sub(r'[^\w\s]', '', c)
+    c = c.replace('_', ' ')
+    return re.sub(r'\s+', ' ', c).strip()
+
+def normalize_title(t: str) -> str:
+    """Normalize job title by removing gender tokens, location tags, and synonyms."""
+    if not t:
+        return ""
+    t = t.lower()
+    # Replace slashes and dashes with spaces
+    t = t.replace('/', ' ').replace('\\', ' ').replace('-', ' ').replace('_', ' ')
+    # Remove gender indicators: (k/m), (m/k), (f/m/x), (m/f/d), etc.
+    t = re.sub(r'\b(k\s*m|m\s*k|f\s*m\s*x|m\s*f\s*d|k\s*m\s*n|k|m|f|x|d)\b', '', t, flags=re.I)
+    # Remove location / contract hints often placed in titles
+    t = re.sub(r'\b(remote|zdalnie|zdalna|b2b|uop|warszawa|warsaw|gdansk|gdynia|sopot|trojmiasto|wroclaw|krakow|poznan|katowice|lodz)\b', '', t, flags=re.I)
+    # Normalize common polish/english title variations
+    t = re.sub(r'\b(testerka|testerki|testerem)\b', 'tester', t)
+    t = re.sub(r'\bin[zż]ynier\b', 'engineer', t)
+    t = re.sub(r'\bspecjalista|specjalistka\b', 'specialist', t)
+    # Strip non-alphanumeric
+    t = re.sub(r'[^\w\s]', '', t)
+    t = t.replace('_', ' ')
+    return re.sub(r'\s+', ' ', t).strip()
+
+def is_generic_company(nc: str) -> bool:
+    """Check if normalized company is a generic placeholder."""
+    if not nc:
+        return True
+    return nc in [
+        'quality island', 'pracuj partner', 'pracujpl partner', 'pracuj pl partner',
+        'pracuj pl', 'pracuj', 'unknown company', 'unknown'
+    ]
+
 def normalize(text: str) -> str:
+    """Backwards compatibility helper."""
     if not text:
         return ""
     t = text.lower()
     t = SUFFIX_STRIP_REGEX.sub('', t)
     t = re.sub(r'[^\w\s]', '', t)
-    t = re.sub(r'\s+', ' ', t).strip()
-    return t
+    return re.sub(r'\s+', ' ', t).strip()
 
-def deduplicate_jobs(jobs: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    seen_keys = set()
+def deduplicate_jobs(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Deduplicate in-memory scraped jobs by clean_url and normalized (company, title)."""
+    seen_urls = set()
+    seen_comp_titles = set()
     unique_jobs = []
     
     for job in jobs:
-        company_norm = normalize(job.get('company', ''))
-        title_norm = normalize(job.get('title', ''))
+        raw_url = job.get('url', '')
+        cu = clean_url(raw_url)
+        nc = normalize_company(job.get('company', ''))
+        nt = normalize_title(job.get('title', ''))
         
-        dedup_key = f"{company_norm}_{title_norm}"
-        
-        if dedup_key not in seen_keys:
-            seen_keys.add(dedup_key)
+        is_dup = False
+        if cu and cu in seen_urls:
+            is_dup = True
+        elif nc and nt and not is_generic_company(nc) and (nc, nt) in seen_comp_titles:
+            is_dup = True
+            
+        if not is_dup:
+            if cu:
+                seen_urls.add(cu)
+            if nc and nt and not is_generic_company(nc):
+                seen_comp_titles.add((nc, nt))
+            job['url'] = cu or raw_url
             unique_jobs.append(job)
             
     return unique_jobs

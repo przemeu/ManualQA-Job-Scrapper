@@ -249,13 +249,42 @@ def auto_scrape_and_notify():
         new_jobs = scrape_res.get('jobs', []) if isinstance(scrape_res, dict) else (scrape_res or [])
         conn = database.get_db()
         cursor = conn.cursor()
+        
+        # Build lookup of existing jobs in database for fast cross-portal deduplication
+        cursor.execute("SELECT title, company, url FROM jobs")
+        existing_urls = set()
+        existing_comp_titles = set()
+        for r in cursor.fetchall():
+            cu = parsers.clean_url(r['url'])
+            if cu:
+                existing_urls.add(cu)
+            nc = parsers.normalize_company(r['company'] or '')
+            nt = parsers.normalize_title(r['title'] or '')
+            if nc and nt and not parsers.is_generic_company(nc):
+                existing_comp_titles.add((nc, nt))
+
         added_jobs = []
         for job in new_jobs:
+            raw_url = job.get('url', '')
+            cu = parsers.clean_url(raw_url)
+            nc = parsers.normalize_company(job.get('company', ''))
+            nt = parsers.normalize_title(job.get('title', ''))
+
+            # Check duplicate against existing DB and already processed jobs
+            if cu in existing_urls or (nc and nt and not parsers.is_generic_company(nc) and (nc, nt) in existing_comp_titles):
+                continue
+
+            if cu:
+                existing_urls.add(cu)
+            if nc and nt and not parsers.is_generic_company(nc):
+                existing_comp_titles.add((nc, nt))
+
+            job_url = cu or raw_url
             try:
-                contract_type = job.get('contract_type') or database.infer_contract_type(job['title'], job['url'], job['source'], job.get('pay', ''))
+                contract_type = job.get('contract_type') or database.infer_contract_type(job['title'], job_url, job['source'], job.get('pay', ''))
                 cursor.execute(
                     "INSERT INTO jobs (title, company, url, source, city, pay, published_at, status, contract_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'NEW', ?)",
-                    (job['title'], job.get('company', ''), job['url'], job['source'], job.get('city', ''), job.get('pay', ''), job.get('published_at', ''), contract_type)
+                    (job['title'], job.get('company', ''), job_url, job['source'], job.get('city', ''), job.get('pay', ''), job.get('published_at', ''), contract_type)
                 )
                 added_jobs.append(job)
             except sqlite3.IntegrityError:
@@ -391,9 +420,9 @@ def add_manual_job(req: ManualJobRequest):
     conn = database.get_db()
     cursor = conn.cursor()
     
-    # Check if URL already exists
-    cursor.execute("SELECT id, title, company, status, stage, is_manual FROM jobs WHERE url = ?", (raw_url,))
-    existing = cursor.fetchone()
+    # Check if offer or duplicate already exists (URL or Company+Title)
+    clean_u = parsers.clean_url(raw_url) or raw_url
+    existing = database.find_duplicate_job(final_title, final_company, clean_u, cursor)
     
     if existing:
         existing_id = existing['id']
@@ -694,6 +723,14 @@ def get_scraper_status():
     import scraper
     return getattr(scraper, "SCRAPER_STATE", {})
 
+@app.post("/api/admin/clean-duplicates")
+def clean_database_duplicates_route():
+    res = database.clean_database_duplicates()
+    return {
+        "message": f"Successfully cleaned {res.get('deleted_count', 0)} duplicate offers across {res.get('clusters_found', 0)} clusters.",
+        "details": res
+    }
+
 @app.post("/api/refresh")
 async def refresh_jobs(portal: str = 'ALL', deep: bool = False):
     import scraper
@@ -709,15 +746,45 @@ async def refresh_jobs(portal: str = 'ALL', deep: bool = False):
     
     conn = database.get_db()
     cursor = conn.cursor()
+    
+    # Build lookup of existing jobs in database for fast cross-portal deduplication
+    cursor.execute("SELECT title, company, url FROM jobs")
+    existing_urls = set()
+    existing_comp_titles = set()
+    for r in cursor.fetchall():
+        cu = parsers.clean_url(r['url'])
+        if cu:
+            existing_urls.add(cu)
+        nc = parsers.normalize_company(r['company'] or '')
+        nt = parsers.normalize_title(r['title'] or '')
+        if nc and nt and not parsers.is_generic_company(nc):
+            existing_comp_titles.add((nc, nt))
+
     added = 0
     db_duplicates = 0
     added_jobs = []
     for job in new_jobs:
+        raw_url = job.get('url', '')
+        cu = parsers.clean_url(raw_url)
+        nc = parsers.normalize_company(job.get('company', ''))
+        nt = parsers.normalize_title(job.get('title', ''))
+
+        # Check duplicate against existing DB and already processed jobs
+        if cu in existing_urls or (nc and nt and not parsers.is_generic_company(nc) and (nc, nt) in existing_comp_titles):
+            db_duplicates += 1
+            continue
+
+        if cu:
+            existing_urls.add(cu)
+        if nc and nt and not parsers.is_generic_company(nc):
+            existing_comp_titles.add((nc, nt))
+
+        job_url = cu or raw_url
         try:
-            contract_type = job.get('contract_type') or database.infer_contract_type(job['title'], job['url'], job['source'], job.get('pay', ''))
+            contract_type = job.get('contract_type') or database.infer_contract_type(job['title'], job_url, job['source'], job.get('pay', ''))
             cursor.execute(
                 "INSERT INTO jobs (title, company, url, source, city, pay, published_at, status, contract_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'NEW', ?)",
-                (job['title'], job.get('company', ''), job['url'], job['source'], job.get('city', ''), job.get('pay', ''), job.get('published_at', ''), contract_type)
+                (job['title'], job.get('company', ''), job_url, job['source'], job.get('city', ''), job.get('pay', ''), job.get('published_at', ''), contract_type)
             )
             added += 1
             added_jobs.append(job)

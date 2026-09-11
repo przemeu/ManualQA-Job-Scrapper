@@ -207,6 +207,9 @@ def infer_company_from_job(row):
         comp_tokens = [t for t in tokens if t.lower() not in title_words and t.lower() not in ['k', 'm', 'f', 'x', 'senior', 'junior', 'lead', 'specjalista', 'inzynier']]
         if comp_tokens:
             c = ' '.join(comp_tokens)
+            c = re.sub(r'\bpl$', '.pl', c, flags=re.I)
+            c = re.sub(r'\bcom$', '.com', c, flags=re.I)
+            c = re.sub(r'\bio$', '.io', c, flags=re.I)
             return re.sub(r'\b(sp\s*z\s*o\s*o|sp\s*k|sa|inc|llc|gmbh)\b', '', c, flags=re.I).strip().title()
 
     # 4. Solid: /offer/(id)/(company)-(title)
@@ -447,6 +450,11 @@ def clean_database_duplicates(conn=None) -> dict:
             if better_comp:
                 updated_fields['company'] = better_comp
                 winner['company'] = better_comp
+        elif '.' in ''.join(x.get('company', '') for x in c) and '.' not in winner.get('company', ''):
+            cleaner_comp = next((x['company'] for x in c if '.' in x.get('company', '')), None)
+            if cleaner_comp:
+                updated_fields['company'] = cleaner_comp
+                winner['company'] = cleaner_comp
 
         if (not winner.get('pay') or winner.get('pay') == 'Not given') and any(x.get('pay') and x.get('pay') != 'Not given' for x in c):
             better_pay = next(x['pay'] for x in c if x.get('pay') and x.get('pay') != 'Not given')
@@ -455,6 +463,10 @@ def clean_database_duplicates(conn=None) -> dict:
 
         if (not winner.get('city') or winner.get('city') == 'Remote') and any(x.get('city') and 'remote' not in x.get('city').lower() for x in c):
             better_city = next(x['city'] for x in c if x.get('city') and 'remote' not in x.get('city').lower())
+            updated_fields['city'] = better_city
+            winner['city'] = better_city
+        elif winner.get('city') == 'Remote' and any('/' in x.get('city', '') for x in c):
+            better_city = next(x['city'] for x in c if '/' in x.get('city', ''))
             updated_fields['city'] = better_city
             winner['city'] = better_city
 

@@ -570,8 +570,8 @@ def normalize_company(c: str) -> str:
     c = re.sub(r'\.(?:io|pl|com|co|net|org|eu|ai)\b', '', c, flags=re.I)
     # Replace separators and underscores with spaces
     c = c.replace('_', ' ').replace('-', ' ').replace('.', ' ').replace('/', ' ')
-    # Strip legal suffixes and generic company words
-    c = re.sub(r'\b(sp\s*z\s*o\s*o|sp\s*zoo|sp\s*k|sp[oó]ka\s*akcyjna|s\s*a|inc|llc|gmbh|poland|polska|group|grupa|technologies|technology|partners?|labs?|software|solutions?)\b', '', c, flags=re.I)
+    # Strip legal suffixes, country tokens, web extensions, and generic company words
+    c = re.sub(r'\b(sp\s*z\s*o\s*o|sp\s*zoo|sp\s*k|sp[oó]ka\s*akcyjna|s\s*a|inc|llc|gmbh|poland|polska|pl|com|io|net|org|eu|co|group|grupa|technologies|technology|partners?|labs?|software|solutions?)\b', '', c, flags=re.I)
     # Strip non-alphanumeric (keeping unicode letters/numbers like ą, ć, etc.)
     c = re.sub(r'[^\w\s]', '', c)
     c = c.replace('_', ' ')

@@ -25,7 +25,10 @@ SCRAPER_STATE = {
     "duplicates": 0,
     "current_portal": "",
     "current_job": "",
-    "current_status": "Idle"
+    "current_status": "Idle",
+    "portal_index": 0,
+    "total_portals": 0,
+    "start_time": 0
 }
 
 def reset_metrics():
@@ -47,7 +50,10 @@ def reset_metrics():
         "duplicates": 0,
         "current_portal": "",
         "current_job": "",
-        "current_status": "Idle"
+        "current_status": "Idle",
+        "portal_index": 0,
+        "total_portals": 0,
+        "start_time": 0
     }
 
 def update_progress(portal: str = "", title: str = "", status: str = ""):
@@ -2009,12 +2015,39 @@ def scrape_qaboard(browser, deep=False):
 def run_scraper(portal="ALL", deep=False):
     global SCRAPER_STATE
     reset_metrics()
+    
+    tasks = []
+    p_upper = portal.upper()
+    if p_upper in ["ALL", "JJIT"]:
+        tasks.append(("JJIT", scrape_jjit))
+    if p_upper in ["ALL", "NFJ"]:
+        tasks.append(("NFJ", scrape_nfj))
+    if p_upper in ["ALL", "PRACUJ"]:
+        tasks.append(("Pracuj", scrape_pracuj))
+    if p_upper in ["ALL", "PROTOCOL"]:
+        tasks.append(("Protocol", scrape_protocol))
+    if p_upper in ["ALL", "BULLDOG"]:
+        tasks.append(("Bulldog", scrape_bulldogjob))
+    if p_upper in ["ALL", "SOLID"]:
+        tasks.append(("Solid", scrape_solidjobs))
+    if p_upper in ["ALL", "4PROGRAMMERS", "4PROG"]:
+        tasks.append(("4programmers", scrape_4programmers))
+    if p_upper in ["ALL", "LINKEDIN"]:
+        tasks.append(("LinkedIn", scrape_linkedin))
+    if p_upper in ["ALL", "ROCKET", "ROCKETJOBS"]:
+        tasks.append(("RocketJobs", scrape_rocketjobs))
+    if p_upper in ["ALL", "QABOARD", "QA_BOARD"]:
+        tasks.append(("QABoard", scrape_qaboard))
+
     SCRAPER_STATE["is_running"] = True
     SCRAPER_STATE["portal"] = portal
     SCRAPER_STATE["deep"] = deep
-    SCRAPER_STATE["current_portal"] = portal
-    SCRAPER_STATE["current_job"] = "Initializing browser..."
-    SCRAPER_STATE["current_status"] = "Launching scraper..."
+    SCRAPER_STATE["current_portal"] = tasks[0][0] if tasks else portal
+    SCRAPER_STATE["current_job"] = "Connecting to portals..."
+    SCRAPER_STATE["current_status"] = "Starting scan..."
+    SCRAPER_STATE["portal_index"] = 0
+    SCRAPER_STATE["total_portals"] = len(tasks)
+    SCRAPER_STATE["start_time"] = time.time()
     
     all_raw_jobs = []
     
@@ -2030,29 +2063,23 @@ def run_scraper(portal="ALL", deep=False):
             ]
         )
         
-        if portal in ["ALL", "JJIT"]:
-            all_raw_jobs.extend(scrape_jjit(browser, deep))
-        if portal in ["ALL", "NFJ"]:
-            all_raw_jobs.extend(scrape_nfj(browser, deep))
-        if portal in ["ALL", "PRACUJ"]:
-            all_raw_jobs.extend(scrape_pracuj(browser, deep))
-        if portal in ["ALL", "PROTOCOL"]:
-            all_raw_jobs.extend(scrape_protocol(browser, deep))
-        if portal in ["ALL", "BULLDOG"]:
-            all_raw_jobs.extend(scrape_bulldogjob(browser, deep))
-        if portal in ["ALL", "SOLID"]:
-            all_raw_jobs.extend(scrape_solidjobs(browser, deep))
-        if portal in ["ALL", "4PROGRAMMERS"]:
-            all_raw_jobs.extend(scrape_4programmers(browser, deep))
-        if portal in ["ALL", "LINKEDIN"]:
-            all_raw_jobs.extend(scrape_linkedin(browser, deep))
-        if portal in ["ALL", "ROCKET", "ROCKETJOBS"]:
-            all_raw_jobs.extend(scrape_rocketjobs(browser, deep))
-        if portal in ["ALL", "QABOARD", "QA_BOARD"]:
-            all_raw_jobs.extend(scrape_qaboard(browser, deep))
+        for idx, (p_name, scraper_func) in enumerate(tasks):
+            SCRAPER_STATE["portal_index"] = idx + 1
+            SCRAPER_STATE["current_portal"] = p_name
+            SCRAPER_STATE["current_job"] = f"Connecting to {p_name}..."
+            SCRAPER_STATE["current_status"] = f"Scanning {p_name}..."
+            try:
+                all_raw_jobs.extend(scraper_func(browser, deep))
+            except Exception as e:
+                logger.error(f"Error scraping {p_name}: {e}")
             
         browser.close()
         
+    SCRAPER_STATE["portal_index"] = len(tasks)
+    SCRAPER_STATE["current_portal"] = "ALL" if portal.upper() == "ALL" else portal
+    SCRAPER_STATE["current_job"] = "Deduplicating offers..."
+    SCRAPER_STATE["current_status"] = "Deduplicating & finalizing..."
+    
     initial_count = len(all_raw_jobs)
     deduplicated = parsers.deduplicate_jobs(all_raw_jobs)
     dedup_diff = initial_count - len(deduplicated)

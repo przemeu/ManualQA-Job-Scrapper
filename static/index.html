@@ -1946,6 +1946,8 @@
         }
 
         let scraperPollInterval = null;
+        let isScrapingDeep = false;
+        let liveTargetProgress = 0;
 
         async function pollScraperStatus() {
             try {
@@ -1960,6 +1962,7 @@
                 const portalEl = document.getElementById('liveCurrentPortal');
                 const jobEl = document.getElementById('liveCurrentJob');
                 const statusEl = document.getElementById('liveCurrentStatus');
+                const progressTitle = document.getElementById('progressTitle');
                 
                 if (scannedEl && state.scanned !== undefined) scannedEl.innerText = state.scanned;
                 if (passedEl && state.passed !== undefined) passedEl.innerText = state.passed;
@@ -1971,6 +1974,33 @@
                 if (portalEl && state.current_portal) portalEl.innerText = state.current_portal;
                 if (jobEl && state.current_job) jobEl.innerText = state.current_job;
                 if (statusEl && state.current_status) statusEl.innerText = state.current_status;
+
+                // Update progress title dynamically based on current portal & step
+                if (progressTitle && state.is_running) {
+                    const deepPrefix = isScrapingDeep ? '🔍 DEEP SCAN — ' : 'SCANNING ';
+                    if (state.total_portals > 1 && state.current_portal && state.portal_index > 0) {
+                        const pUpper = state.current_portal.toUpperCase();
+                        progressTitle.innerHTML = `<i class="fas fa-satellite-dish text-indigo-600 animate-pulse mr-2"></i>${deepPrefix}${pUpper} (${state.portal_index}/${state.total_portals})...`;
+                    } else if (state.total_portals === 1 && state.current_portal) {
+                        const pUpper = state.current_portal.toUpperCase();
+                        progressTitle.innerHTML = `<i class="fas fa-satellite-dish text-indigo-600 animate-pulse mr-2"></i>${deepPrefix}${pUpper}...`;
+                    } else if (state.current_status && state.current_status.toLowerCase().includes('finaliz')) {
+                        progressTitle.innerHTML = `<i class="fas fa-clone text-indigo-600 animate-pulse mr-2"></i>DEDUPLICATING & FINALIZING...`;
+                    }
+                }
+
+                // Update target progress anchored to real portal progression
+                if (state.total_portals && state.total_portals > 0) {
+                    const totalP = state.total_portals;
+                    const pIdx = state.portal_index || 0;
+                    if (pIdx === 0) {
+                        liveTargetProgress = 3;
+                    } else {
+                        const slice = 100 / totalP;
+                        const base = ((pIdx - 1) / totalP) * 100;
+                        liveTargetProgress = Math.min(95, base + (slice * 0.75));
+                    }
+                }
             } catch(e) {
                 // Ignore transient network errors during rapid polling
             }
@@ -2025,6 +2055,7 @@
 
         async function refreshJobs(portal, deep = false) {
             disableButtons(true);
+            isScrapingDeep = deep;
             
             // Hide previous summary banner while scraping
             dismissSummaryBanner();
@@ -2052,7 +2083,7 @@
             if (autoEl) autoEl.innerText = '0';
             if (otherEl) otherEl.innerText = '0';
             if (portalEl) portalEl.innerText = portal;
-            if (jobEl) jobEl.innerText = 'Launching browser...';
+            if (jobEl) jobEl.innerText = 'Connecting to portals...';
             if (statusEl) statusEl.innerText = 'Starting...';
             
             loadingState.classList.remove('hidden');
@@ -2062,23 +2093,44 @@
             if (deep) {
                 estimatedSeconds = (portal === 'ALL') ? 600 : 180;
             } else {
-                estimatedSeconds = (portal === 'ALL') ? 80 : 20;
+                estimatedSeconds = (portal === 'ALL') ? 220 : 25;
             }
-            const estMinutes = Math.ceil(estimatedSeconds / 60);
-            progressTime.innerText = deep ? `Est. ~${estMinutes} min (Deep)` : `Est. ~${estimatedSeconds}s`;
-            progressTitle.innerText = deep 
-                ? `🔍 DEEP SEARCH — ${portal}` 
-                : `LAUNCHING BROWSER FOR ${portal}`;
+            const estMinutes = (estimatedSeconds >= 60) ? (estimatedSeconds / 60).toFixed(1).replace('.0', '') : null;
+            progressTime.innerText = estMinutes ? `Est. ~${estMinutes} min` : `Est. ~${estimatedSeconds}s`;
             
-            let progress = 0;
-            const tickRate = 400;
-            const increment = 100 / ((estimatedSeconds * 1000) / tickRate);
+            const initialTitle = portal === 'ALL' 
+                ? (deep ? '🔍 DEEP SCANNING ALL PORTALS...' : 'SCANNING ALL PORTALS...') 
+                : (deep ? `🔍 DEEP SCANNING ${portal}...` : `SCANNING ${portal}...`);
+            progressTitle.innerHTML = `<i class="fas fa-satellite-dish text-indigo-600 animate-pulse mr-2"></i>${initialTitle}`;
+            
+            let currentProgress = 0;
+            liveTargetProgress = 2;
+            const startTime = Date.now();
+            const tickRate = 150;
             
             progressInterval = setInterval(() => {
-                if (progress < 98) {
-                    progress += (increment * (1 - (progress/100)));
-                    progressBar.style.width = `${progress}%`;
-                    progressPercent.innerText = `${Math.floor(progress)}%`;
+                if (currentProgress < liveTargetProgress) {
+                    const diff = liveTargetProgress - currentProgress;
+                    currentProgress += Math.max(0.12, diff * 0.08);
+                } else if (currentProgress < 96 && liveTargetProgress > 0) {
+                    currentProgress += 0.03;
+                }
+                currentProgress = Math.min(currentProgress, 98);
+                progressBar.style.width = `${currentProgress.toFixed(1)}%`;
+                progressPercent.innerText = `${Math.floor(currentProgress)}%`;
+
+                // Update estimated remaining time dynamically based on elapsed time & actual progress
+                const elapsedSec = (Date.now() - startTime) / 1000;
+                if (currentProgress >= 4 && elapsedSec > 3) {
+                    const projectedTotal = elapsedSec / (currentProgress / 100);
+                    const remainingSec = Math.max(5, Math.round(projectedTotal - elapsedSec));
+                    if (remainingSec >= 60) {
+                        const m = Math.floor(remainingSec / 60);
+                        const s = remainingSec % 60;
+                        progressTime.innerText = s > 0 ? `Est. ~${m}m ${s}s` : `Est. ~${m} min`;
+                    } else {
+                        progressTime.innerText = `Est. ~${remainingSec}s`;
+                    }
                 }
             }, tickRate);
 
@@ -2104,7 +2156,8 @@
 
             progressBar.style.width = '100%';
             progressPercent.innerText = `100%`;
-            progressTitle.innerText = `COMPLETE!`;
+            progressTime.innerText = 'Done';
+            progressTitle.innerHTML = `<i class="fas fa-check-circle text-emerald-500 mr-2"></i>COMPLETE!`;
             
             setTimeout(() => {
                 loadingState.classList.add('hidden');
